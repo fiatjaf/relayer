@@ -37,6 +37,11 @@ func unwatchPubKey(excludedKey string, ws *websocket.Conn) {
 			if existingWs == ws {
 				continue
 			}
+			if i == len(wss) {
+				// if we reach this point it is because the key we were
+				// excluding wasn't here in the first place
+				return
+			}
 			newWss[i] = existingWs
 			i++
 		}
