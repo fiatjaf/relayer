@@ -1,4 +1,4 @@
-// +build !lite
+// +build lite
 
 package main
 
