@@ -369,11 +369,9 @@ func requestEvent(body []byte, conn *websocket.Conn) error {
 	go func() {
 		// get events that reference this
 		var related []Event
-		if err := db.Select(&related, `
-            SELECT * FROM event
-            WHERE ref = $1
-            LIMIT $2
-        `, data.Id, data.Limit); err == nil {
+		if err := db.Select(&related,
+			relatedEventsQuery,
+			data.Id, data.Limit); err == nil {
 			for _, evt := range related {
 				jevent, _ := json.Marshal([]interface{}{
 					evt,

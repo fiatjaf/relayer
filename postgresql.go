@@ -30,3 +30,9 @@ CREATE INDEX pubkeytimeidx ON event (pubkey, created_at);
 	log.Print(err)
 	return db, nil
 }
+
+const relatedEventsQuery = `
+  SELECT * FROM event
+  WHERE tags @@ '$[*][1] == "' || $1 || '"'
+  LIMIT $2
+`
