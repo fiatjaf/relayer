@@ -92,10 +92,10 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				err = requestFeed(message[len([]byte("req-feed:")):], conn)
 
 			case strings.HasPrefix(text, "req-event:"):
-				err = requestEvent(message[len([]byte("req-event")):], conn)
+				err = requestEvent(message[len([]byte("req-event:")):], conn)
 
 			case strings.HasPrefix(text, "req-key:"):
-				err = requestKey(message[len([]byte("req-key")):], conn)
+				err = requestKey(message[len([]byte("req-key:")):], conn)
 			}
 
 			if err != nil {
