@@ -120,7 +120,6 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case <-ticker.C:
-				conn.SetWriteDeadline(time.Now().Add(writeWait))
 				err := conn.WriteMessage(websocket.TextMessage, []byte("PING"))
 				if err != nil {
 					log.Warn().Err(err).Msg("error writing ping, closing websocket")
