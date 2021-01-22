@@ -169,7 +169,7 @@ func saveEvent(body []byte) error {
 	switch evt.Kind {
 	case KindSetMetadata:
 		// delete past set_metadata events from this user
-		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 1`, evt.PubKey)
+		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 0`, evt.PubKey)
 	case KindTextNote:
 		// do nothing
 	case KindRecommendServer:
