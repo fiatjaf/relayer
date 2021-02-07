@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -78,8 +79,12 @@ func (evt *Event) Serialize() []byte {
 	// content
 	arr[5] = evt.Content
 
-	serialized, _ := json.Marshal(arr)
-	return serialized
+	serialized := new(bytes.Buffer)
+
+	enc := json.NewEncoder(serialized)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(arr)
+	return serialized.Bytes()[:serialized.Len()-1] // Encode add new line char
 }
 
 // CheckSignature checks if the signature is valid for the id
