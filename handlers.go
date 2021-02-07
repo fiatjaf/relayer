@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -28,8 +27,6 @@ const (
 	// Maximum message size allowed from peer.
 	maxMessageSize = 512000
 )
-
-var ratelimiter = rate.NewLimiter(rate.Every(time.Second*40), 2)
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -132,10 +129,6 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveEvent(body []byte) error {
-	if !ratelimiter.Allow() {
-		return errors.New("rate-limit")
-	}
-
 	var evt Event
 	err := json.Unmarshal(body, &evt)
 	if err != nil {
