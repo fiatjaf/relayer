@@ -24,6 +24,11 @@ func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 		params = append(params, filter.Author)
 	}
 
+	if filter.Kind != 0 {
+		conditions = append(conditions, "kind = ?")
+		params = append(params, filter.Kind)
+	}
+
 	if filter.Authors != nil {
 		inkeys := make([]string, 0, len(filter.Authors))
 		for _, key := range filter.Authors {
@@ -58,10 +63,11 @@ func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 		conditions = append(conditions, "true")
 	}
 
-	err = db.Select(&events, "SELECT * FROM event WHERE "+
-		strings.Join(conditions, " AND ")+
-		"ORDER BY created_at LIMIT 100", params...,
-	)
+	query := db.Rebind("SELECT * FROM event WHERE " +
+		strings.Join(conditions, " AND ") +
+		"ORDER BY created_at LIMIT 100")
+
+	err = db.Select(&events, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		log.Warn().Err(err).Interface("filter", filter).Msg("failed to fetch events")
 		err = fmt.Errorf("failed to fetch events: %w", err)
