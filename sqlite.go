@@ -30,8 +30,4 @@ CREATE INDEX pubkeytimeidx ON event (pubkey, created_at);
 	return db, nil
 }
 
-const relatedEventsQuery = `
-  SELECT * FROM event
-  WHERE tags LIKE '%' || $1 || '%'
-  LIMIT $2
-`
+const relatedEventsCondition = `tags LIKE '%' || ? || '%'`

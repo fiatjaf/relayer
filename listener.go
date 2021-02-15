@@ -1,99 +1,61 @@
 package main
 
 import (
-	"encoding/json"
 	"sync"
 
+	"github.com/fiatjaf/go-nostr/event"
+	"github.com/fiatjaf/go-nostr/filter"
 	"github.com/gorilla/websocket"
 )
 
-var watchers = make(map[string][]*websocket.Conn)
-var backwatchers = make(map[*websocket.Conn][]string)
-var wlock = sync.Mutex{}
+type Listener struct {
+	ws      *websocket.Conn
+	filters []*filter.EventFilter
+}
 
-func watchPubKey(key string, ws *websocket.Conn) {
-	wlock.Lock()
-	defer wlock.Unlock()
+var listeners = make(map[string]*Listener)
+var listenersMutex = sync.Mutex{}
 
-	currentKeys, _ := backwatchers[ws]
-	backwatchers[ws] = append(currentKeys, key)
+func setListener(id string, conn *websocket.Conn, filters []*filter.EventFilter) {
+	listenersMutex.Lock()
+	defer func() {
+		listenersMutex.Unlock()
+	}()
 
-	if wss, ok := watchers[key]; ok {
-		watchers[key] = append(wss, ws)
-	} else {
-		watchers[key] = []*websocket.Conn{ws}
+	listeners[id] = &Listener{
+		ws:      conn,
+		filters: filters,
 	}
 }
 
-func unwatchPubKey(excludedKey string, ws *websocket.Conn) {
-	wlock.Lock()
-	defer wlock.Unlock()
+func removeListener(id string) {
+	listenersMutex.Lock()
+	defer func() {
+		listenersMutex.Unlock()
+	}()
 
-	if wss, ok := watchers[excludedKey]; ok {
-		newWss := make([]*websocket.Conn, len(wss)-1)
+	delete(listeners, id)
+}
 
-		var i = 0
-		for _, existingWs := range wss {
-			if existingWs == ws {
-				continue
+func notifyListeners(event *event.Event) {
+	listenersMutex.Lock()
+	defer func() {
+		listenersMutex.Unlock()
+	}()
+
+	for id, listener := range listeners {
+		match := false
+		for _, filter := range listener.filters {
+			if filter.Matches(event) {
+				match = true
+				break
 			}
-			if i == len(wss) {
-				// if we reach this point it is because the key we were
-				// excluding wasn't here in the first place
-				return
-			}
-			newWss[i] = existingWs
-			i++
 		}
 
-		watchers[excludedKey] = newWss
-	}
-
-	currentKeys, _ := backwatchers[ws]
-	newKeys := make([]string, 0, len(currentKeys))
-	for _, currentKey := range currentKeys {
-		if excludedKey == currentKey {
+		if !match {
 			continue
 		}
-		newKeys = append(newKeys, currentKey)
-	}
 
-	backwatchers[ws] = newKeys
-}
-
-func removeFromWatchers(es *websocket.Conn) {
-	wlock.Lock()
-	defer wlock.Unlock()
-
-	for _, key := range backwatchers[es] {
-		if arr, ok := watchers[key]; ok {
-			newarr := make([]*websocket.Conn, len(arr)-1)
-			i := 0
-			for _, oldes := range arr {
-				if oldes == es {
-					continue
-				}
-				newarr[i] = oldes
-				i++
-			}
-			watchers[key] = newarr
-		}
-	}
-	delete(backwatchers, es)
-}
-
-func notifyPubKeyEvent(key string, evt *Event) {
-	wlock.Lock()
-	arr, ok := watchers[key]
-	wlock.Unlock()
-
-	if ok {
-		for _, conn := range arr {
-			jevent, _ := json.Marshal([]interface{}{
-				evt,
-				"n",
-			})
-			conn.WriteMessage(websocket.TextMessage, jevent)
-		}
+		listener.ws.WriteJSON([]interface{}{"EVENT", id, event})
 	}
 }

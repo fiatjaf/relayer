@@ -2,15 +2,15 @@ package main
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/fiatjaf/go-nostr/event"
+	"github.com/fiatjaf/go-nostr/filter"
 	"github.com/gorilla/websocket"
 )
 
@@ -69,40 +69,66 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			text := string(message)
+			go func(message []byte) {
+				var err error
 
-			switch {
-			case text == "PING":
-				conn.WriteMessage(websocket.TextMessage, []byte("PONG"))
+				defer func() {
+					if err != nil {
+						conn.WriteJSON([]interface{}{"NOTICE", err.Error()})
+					}
+				}()
 
-			case strings.HasPrefix(text, "{"):
-				// it's a new event
-				err = saveEvent(message)
+				var request []json.RawMessage
+				err = json.Unmarshal(message, &request)
+				if err == nil && len(request) < 2 {
+					err = errors.New("request has less than parameters")
+					return
+				}
 
-			case strings.HasPrefix(text, "sub-key:"):
-				watchPubKey(strings.TrimSpace(text[8:]), conn)
+				var typ string
+				json.Unmarshal(request[0], &typ)
 
-			case strings.HasPrefix(text, "unsub-key:"):
-				unwatchPubKey(strings.TrimSpace(text[10:]), conn)
+				switch typ {
+				case "EVENT":
+					// it's a new event
+					err = saveEvent(request[1])
 
-			case strings.HasPrefix(text, "req-feed:"):
-				err = requestFeed(message[len([]byte("req-feed:")):], conn)
+				case "REQ":
+					var id string
+					json.Unmarshal(request[0], &id)
+					if id == "" {
+						err = errors.New("REQ has no <id>")
+						return
+					}
 
-			case strings.HasPrefix(text, "req-event:"):
-				err = requestEvent(message[len([]byte("req-event:")):], conn)
+					filters := make([]*filter.EventFilter, len(request)-2)
+					for i, filterReq := range request[2:] {
+						err = json.Unmarshal(filterReq, &filters[i])
+						if err != nil {
+							return
+						}
 
-			case strings.HasPrefix(text, "req-key:"):
-				err = requestKey(message[len([]byte("req-key:")):], conn)
-			}
+						events, err := queryEvents(filters[i])
+						if err == nil {
+							for _, event := range events {
+								conn.WriteJSON([]interface{}{"EVENT", id, event})
+							}
+						}
+					}
 
-			if err != nil {
-				errj, _ := json.Marshal([]interface{}{
-					"notice",
-					err.Error(),
-				})
-				conn.WriteMessage(websocket.TextMessage, errj)
-				continue
-			}
+					setListener(id, conn, filters)
+
+				case "CLOSE":
+					var id string
+					json.Unmarshal(request[0], &id)
+					if id == "" {
+						err = errors.New("CLOSE has no <id>")
+						return
+					}
+
+					removeListener(id)
+				}
+			}(message)
 		}
 	}()
 
@@ -129,7 +155,7 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveEvent(body []byte) error {
-	var evt Event
+	var evt event.Event
 	err := json.Unmarshal(body, &evt)
 	if err != nil {
 		log.Warn().Err(err).Msg("couldn't decode body")
@@ -160,16 +186,16 @@ func saveEvent(body []byte) error {
 
 	// react to different kinds of events
 	switch evt.Kind {
-	case KindSetMetadata:
+	case event.KindSetMetadata:
 		// delete past set_metadata events from this user
 		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 0`, evt.PubKey)
-	case KindTextNote:
+	case event.KindTextNote:
 		// do nothing
-	case KindRecommendServer:
+	case event.KindRecommendServer:
 		// delete past recommend_server events equal to this one
 		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 2 AND content = $2`,
 			evt.PubKey, evt.Content)
-	case KindContactList:
+	case event.KindContactList:
 		// delete past contact lists from this same pubkey
 		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 3`, evt.PubKey)
 	}
@@ -190,193 +216,6 @@ func saveEvent(body []byte) error {
 		return errors.New("failed to save event")
 	}
 
-	notifyPubKeyEvent(evt.PubKey, &evt)
-	return nil
-}
-
-func requestFeed(body []byte, conn *websocket.Conn) error {
-	var data struct {
-		Limit  int `json:"limit"`
-		Offset int `json:"offset"`
-	}
-	json.Unmarshal(body, &data)
-
-	if data.Limit <= 0 || data.Limit > 100 {
-		data.Limit = 50
-	}
-	if data.Offset < 0 {
-		data.Offset = 0
-	} else if data.Offset > 500 {
-		return errors.New("offset over 500")
-	}
-
-	keys, ok := backwatchers[conn]
-	if !ok {
-		return errors.New("not subscribed to anything")
-	}
-
-	inkeys := make([]string, 0, len(keys))
-	for _, key := range keys {
-		// to prevent sql attack here we will check if these keys are valid 32byte hex
-		parsed, err := hex.DecodeString(key)
-		if err != nil || len(parsed) != 32 {
-			continue
-		}
-		inkeys = append(inkeys, fmt.Sprintf("'%x'", parsed))
-	}
-	var lastUpdates []Event
-	err := db.Select(&lastUpdates, `
-        SELECT *
-        FROM event
-        WHERE pubkey IN (`+strings.Join(inkeys, ",")+`)
-        ORDER BY created_at DESC
-        LIMIT $1
-        OFFSET $2
-    `, data.Limit, data.Offset)
-	if err != nil && err != sql.ErrNoRows {
-		log.Warn().Err(err).Interface("keys", keys).Msg("failed to fetch events")
-		return errors.New("failed to fetch events")
-	}
-
-	for _, evt := range lastUpdates {
-		jevent, _ := json.Marshal([]interface{}{
-			evt,
-			"p",
-		})
-		conn.WriteMessage(websocket.TextMessage, jevent)
-	}
-
-	return nil
-}
-
-func requestKey(body []byte, conn *websocket.Conn) error {
-	var data struct {
-		Key    string `json:"key"`
-		Limit  int    `json:"limit"`
-		Offset int    `json:"offset"`
-	}
-	json.Unmarshal(body, &data)
-	if data.Key == "" {
-		return errors.New("invalid pubkey")
-	}
-	if data.Limit <= 0 || data.Limit > 100 {
-		data.Limit = 30
-	}
-	if data.Offset < 0 {
-		data.Offset = 0
-	} else if data.Offset > 300 {
-		return errors.New("offset over 300")
-	}
-
-	go func() {
-		var metadata Event
-		if err := db.Get(&metadata, `
-            SELECT * FROM event
-            WHERE pubkey = $1 AND kind = 0
-        `, data.Key); err == nil {
-			jevent, _ := json.Marshal([]interface{}{
-				metadata,
-				"r",
-			})
-			conn.WriteMessage(websocket.TextMessage, jevent)
-		} else if err != sql.ErrNoRows {
-			log.Warn().Err(err).
-				Str("key", data.Key).
-				Msg("error fetching metadata from requested user")
-		}
-	}()
-
-	go func() {
-		var lastUpdates []Event
-		if err := db.Select(&lastUpdates, `
-            SELECT * FROM event
-            WHERE pubkey = $1 AND kind != 0
-            ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
-        `, data.Key, data.Limit, data.Offset); err == nil {
-			for _, evt := range lastUpdates {
-				jevent, _ := json.Marshal([]interface{}{
-					evt,
-					"r",
-				})
-				conn.WriteMessage(websocket.TextMessage, jevent)
-			}
-		} else if err != sql.ErrNoRows {
-			log.Warn().Err(err).
-				Str("key", data.Key).
-				Msg("error fetching updates from requested user")
-		}
-	}()
-
-	return nil
-}
-
-func requestEvent(body []byte, conn *websocket.Conn) error {
-	var data struct {
-		Id    string `json:"id"`
-		Limit int    `json:"limit"`
-	}
-	json.Unmarshal(body, &data)
-	if data.Id == "" {
-		return errors.New("no id provided")
-	}
-	if data.Limit > 100 || data.Limit <= 0 {
-		data.Limit = 50
-	}
-
-	go func() {
-		// get requested event
-		var evt Event
-		if err := db.Get(&evt, `
-            SELECT * FROM event WHERE id = $1
-        `, data.Id); err == nil {
-			jevent, _ := json.Marshal([]interface{}{
-				evt,
-				"r",
-			})
-			conn.WriteMessage(websocket.TextMessage, jevent)
-		} else if err != sql.ErrNoRows {
-			log.Warn().Err(err).
-				Str("key", data.Id).
-				Msg("error fetching a specific event")
-		}
-
-		for _, tag := range evt.Tags {
-			log.Print(tag)
-			// get referenced event TODO
-			// var ref Event
-			// if err := db.Get(&ref, `
-			//     SELECT * FROM event WHERE id = $1
-			// `, evt.Ref); err == nil {
-			// 	jevent, _ := json.Marshal(ref)
-			// 	(*es).SendEventMessage(string(jevent), "r", "")
-			// } else if err != sql.ErrNoRows {
-			// 	log.Warn().Err(err).
-			// 		Str("key", data.Id).Str("ref", evt.Ref).
-			// 		Msg("error fetching a referenced event")
-			// }
-		}
-	}()
-
-	go func() {
-		// get events that reference this
-		var related []Event
-		if err := db.Select(&related,
-			relatedEventsQuery,
-			data.Id, data.Limit); err == nil {
-			for _, evt := range related {
-				jevent, _ := json.Marshal([]interface{}{
-					evt,
-					"r",
-				})
-				conn.WriteMessage(websocket.TextMessage, jevent)
-			}
-		} else if err != sql.ErrNoRows {
-			log.Warn().Err(err).
-				Str("key", data.Id).
-				Msg("error fetching events that reference requested event")
-		}
-	}()
-
+	notifyListeners(&evt)
 	return nil
 }

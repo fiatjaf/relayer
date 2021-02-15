@@ -31,8 +31,4 @@ CREATE INDEX pubkeytimeidx ON event (pubkey, created_at);
 	return db, nil
 }
 
-const relatedEventsQuery = `
-  SELECT * FROM event
-  WHERE tags @@ '$[*][1] == "' || $1 || '"'
-  LIMIT $2
-`
+const relatedEventsCondition = `tags @@ '$[*][1] == "' || ? || '"'`
