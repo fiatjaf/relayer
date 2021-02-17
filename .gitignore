@@ -1,3 +1,4 @@
 relay-lite
 relay-full
 *.sqlite
+*.env

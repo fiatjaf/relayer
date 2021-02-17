@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
@@ -36,6 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to open database")
 	}
+	db.Mapper = reflectx.NewMapperFunc("json", sqlx.NameMapper)
 
 	// NIP01
 	router.Path("/ws").Methods("GET").HandlerFunc(handleWebsocket)

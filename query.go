@@ -65,7 +65,7 @@ func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 
 	query := db.Rebind("SELECT * FROM event WHERE " +
 		strings.Join(conditions, " AND ") +
-		"ORDER BY created_at LIMIT 100")
+		" ORDER BY created_at LIMIT 100")
 
 	err = db.Select(&events, query, params...)
 	if err != nil && err != sql.ErrNoRows {

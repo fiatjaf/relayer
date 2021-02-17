@@ -84,6 +84,9 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 					err = errors.New("request has less than parameters")
 					return
 				}
+				if err != nil {
+					return
+				}
 
 				var typ string
 				json.Unmarshal(request[0], &typ)
