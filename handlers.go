@@ -98,7 +98,7 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 				case "REQ":
 					var id string
-					json.Unmarshal(request[0], &id)
+					json.Unmarshal(request[1], &id)
 					if id == "" {
 						err = errors.New("REQ has no <id>")
 						return
