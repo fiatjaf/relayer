@@ -40,7 +40,7 @@ func main() {
 	db.Mapper = reflectx.NewMapperFunc("json", sqlx.NameMapper)
 
 	// NIP01
-	router.Path("/ws").Methods("GET").HandlerFunc(handleWebsocket)
+	router.Path("/").Methods("GET").HandlerFunc(handleWebsocket)
 
 	srv := &http.Server{
 		Handler:           cors.Default().Handler(router),
