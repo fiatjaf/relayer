@@ -161,7 +161,7 @@ func saveEvent(body []byte) error {
 	var evt event.Event
 	err := json.Unmarshal(body, &evt)
 	if err != nil {
-		log.Warn().Err(err).Msg("couldn't decode body")
+		log.Warn().Err(err).Str("body", string(body)).Msg("couldn't decode body")
 		return errors.New("failed to decode event")
 	}
 
