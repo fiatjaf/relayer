@@ -3,7 +3,7 @@ module github.com/fiatjaf/nostr-relay
 go 1.15
 
 require (
-	github.com/fiatjaf/go-nostr v0.1.0
+	github.com/fiatjaf/go-nostr v0.1.1
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/jmoiron/sqlx v1.3.1
