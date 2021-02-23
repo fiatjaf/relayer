@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,6 +14,11 @@ import (
 func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 	var conditions []string
 	var params []interface{}
+
+	if filter == nil {
+		err = errors.New("filter cannot be null")
+		return
+	}
 
 	if filter.ID != "" {
 		conditions = append(conditions, "id = ?")

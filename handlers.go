@@ -146,12 +146,11 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case <-ticker.C:
-				err := conn.WriteMessage(websocket.TextMessage, []byte("PING"))
+				err := conn.WriteMessage(websocket.PingMessage, nil)
 				if err != nil {
 					log.Warn().Err(err).Msg("error writing ping, closing websocket")
 					return
 				}
-				conn.WriteMessage(websocket.PingMessage, nil)
 			}
 		}
 	}()

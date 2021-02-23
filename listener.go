@@ -46,6 +46,11 @@ func notifyListeners(event *event.Event) {
 	for id, listener := range listeners {
 		match := false
 		for _, filter := range listener.filters {
+			if filter == nil {
+				match = false
+				break
+			}
+
 			if filter.Matches(event) {
 				match = true
 				break
