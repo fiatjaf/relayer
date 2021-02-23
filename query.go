@@ -36,17 +36,22 @@ func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 	}
 
 	if filter.Authors != nil {
-		inkeys := make([]string, 0, len(filter.Authors))
-		for _, key := range filter.Authors {
-			// to prevent sql attack here we will check if
-			// these keys are valid 32byte hex
-			parsed, err := hex.DecodeString(key)
-			if err != nil || len(parsed) != 32 {
-				continue
+		if len(filter.Authors) == 0 {
+			// authors being [] means you won't get anything
+			return
+		} else {
+			inkeys := make([]string, 0, len(filter.Authors))
+			for _, key := range filter.Authors {
+				// to prevent sql attack here we will check if
+				// these keys are valid 32byte hex
+				parsed, err := hex.DecodeString(key)
+				if err != nil || len(parsed) != 32 {
+					continue
+				}
+				inkeys = append(inkeys, fmt.Sprintf("'%x'", parsed))
 			}
-			inkeys = append(inkeys, fmt.Sprintf("'%x'", parsed))
+			conditions = append(conditions, `pubkey IN (`+strings.Join(inkeys, ",")+`)`)
 		}
-		conditions = append(conditions, `pubkey IN (`+strings.Join(inkeys, ",")+`)`)
 	}
 
 	if filter.TagEvent != "" {
