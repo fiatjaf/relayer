@@ -14,7 +14,7 @@ func initDB() (*sqlx.DB, error) {
 	}
 
 	_, err = db.Exec(`
-CREATE TABLE event (
+CREATE TABLE IF NOT EXISTS event (
   id text NOT NULL,
   pubkey text NOT NULL,
   created_at integer NOT NULL,
@@ -24,8 +24,8 @@ CREATE TABLE event (
   sig text NOT NULL
 );
 
-CREATE UNIQUE INDEX ididx ON event (id);
-CREATE INDEX pubkeytimeidx ON event (pubkey, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ididx ON event (id);
+CREATE UNIQUE INDEX IF NOT EXISTS pubkeytimeidx ON event (pubkey, created_at);
     `)
 	log.Print(err)
 	return db, nil
