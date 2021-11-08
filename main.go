@@ -18,7 +18,6 @@ type Settings struct {
 	Port string `envconfig:"PORT" default:"7447"`
 
 	PostgresDatabase string `envconfig:"POSTGRESQL_DATABASE"`
-	SQLiteDatabase   string `envconfig:"SQLITE_DATABASE"`
 }
 
 var s Settings
