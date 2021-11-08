@@ -1,2 +1,2 @@
-relay: $(shell find . -name "*.go")
-	go build -ldflags="-s -w" -o ./relay
+relayer: $(shell find . -name "*.go")
+	go build -ldflags="-s -w" -o ./relayer
