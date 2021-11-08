@@ -1,4 +1,2 @@
-relay-lite
-relay-full
-*.sqlite
+relay
 *.env
