@@ -191,8 +191,6 @@ func saveEvent(body []byte) error {
 	case event.KindSetMetadata:
 		// delete past set_metadata events from this user
 		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 0`, evt.PubKey)
-	case event.KindTextNote:
-		// do nothing
 	case event.KindRecommendServer:
 		// delete past recommend_server events equal to this one
 		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 2 AND content = $2`,
@@ -200,6 +198,13 @@ func saveEvent(body []byte) error {
 	case event.KindContactList:
 		// delete past contact lists from this same pubkey
 		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 3`, evt.PubKey)
+	default:
+		// delete all but the 10 most recent ones
+		db.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = $2 AND created_at < (
+          SELECT created_at FROM event WHERE pubkey = $1
+          ORDER BY created_at DESC OFFSET 10 LIMIT 1
+        )`,
+			evt.PubKey, evt.Kind)
 	}
 
 	// insert

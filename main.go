@@ -39,6 +39,8 @@ func main() {
 	}
 	db.Mapper = reflectx.NewMapperFunc("json", sqlx.NameMapper)
 
+	go cleanupRoutine()
+
 	// NIP01
 	router.Path("/").Methods("GET").HandlerFunc(handleWebsocket)
 

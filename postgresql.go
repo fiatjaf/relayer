@@ -1,5 +1,3 @@
-// +build !lite
-
 package main
 
 import (
