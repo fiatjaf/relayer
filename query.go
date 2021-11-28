@@ -55,12 +55,12 @@ func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 	}
 
 	if filter.TagEvent != "" {
-		conditions = append(conditions, relatedEventsCondition)
+		conditions = append(conditions, tagConditions)
 		params = append(params, filter.TagEvent)
 	}
 
 	if filter.TagProfile != "" {
-		conditions = append(conditions, relatedEventsCondition)
+		conditions = append(conditions, tagConditions)
 		params = append(params, filter.TagProfile)
 	}
 

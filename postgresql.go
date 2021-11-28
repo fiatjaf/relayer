@@ -29,4 +29,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS pubkeytimeidx ON event (pubkey, created_at);
 	return db, nil
 }
 
-const relatedEventsCondition = `tags @@ '$[*][1] == "' || ? || '"'`
+const tagConditions = `jsonb_path_match(tags, '$[*][1] == $value', jsonb_build_object('value', ?::text))`
