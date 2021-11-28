@@ -85,6 +85,7 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if err != nil {
+					err = nil
 					return
 				}
 
