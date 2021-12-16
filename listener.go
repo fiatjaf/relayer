@@ -10,13 +10,13 @@ import (
 
 type Listener struct {
 	ws      *websocket.Conn
-	filters []*filter.EventFilter
+	filters filter.EventFilters
 }
 
 var listeners = make(map[string]*Listener)
 var listenersMutex = sync.Mutex{}
 
-func setListener(id string, conn *websocket.Conn, filters []*filter.EventFilter) {
+func setListener(id string, conn *websocket.Conn, filters filter.EventFilters) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()
@@ -44,20 +44,7 @@ func notifyListeners(event *event.Event) {
 	}()
 
 	for id, listener := range listeners {
-		match := false
-		for _, filter := range listener.filters {
-			if filter == nil {
-				match = false
-				break
-			}
-
-			if filter.Matches(event) {
-				match = true
-				break
-			}
-		}
-
-		if !match {
+		if !listener.filters.Match(event) {
 			continue
 		}
 

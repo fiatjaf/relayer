@@ -105,14 +105,14 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					filters := make([]*filter.EventFilter, len(request)-2)
+					filters := make(filter.EventFilters, len(request)-2)
 					for i, filterReq := range request[2:] {
 						err = json.Unmarshal(filterReq, &filters[i])
 						if err != nil {
 							return
 						}
 
-						events, err := queryEvents(filters[i])
+						events, err := queryEvents(&filters[i])
 						if err == nil {
 							for _, event := range events {
 								conn.WriteJSON([]interface{}{"EVENT", id, event})

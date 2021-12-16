@@ -25,11 +25,6 @@ func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 		params = append(params, filter.ID)
 	}
 
-	if filter.Author != "" {
-		conditions = append(conditions, "pubkey = ?")
-		params = append(params, filter.Author)
-	}
-
 	if filter.Kind != nil && *filter.Kind != 0 {
 		conditions = append(conditions, "kind = ?")
 		params = append(params, filter.Kind)
