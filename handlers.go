@@ -130,7 +130,7 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					removeListener(id)
+					removeListener(conn, id)
 				}
 			}(message)
 		}

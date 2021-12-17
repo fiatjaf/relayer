@@ -9,11 +9,10 @@ import (
 )
 
 type Listener struct {
-	ws      *websocket.Conn
 	filters filter.EventFilters
 }
 
-var listeners = make(map[string]*Listener)
+var listeners = make(map[*websocket.Conn]map[string]*Listener)
 var listenersMutex = sync.Mutex{}
 
 func setListener(id string, conn *websocket.Conn, filters filter.EventFilters) {
@@ -22,19 +21,30 @@ func setListener(id string, conn *websocket.Conn, filters filter.EventFilters) {
 		listenersMutex.Unlock()
 	}()
 
-	listeners[id] = &Listener{
-		ws:      conn,
+	subs, ok := listeners[conn]
+	if !ok {
+		subs = make(map[string]*Listener)
+		listeners[conn] = subs
+	}
+
+	subs[id] = &Listener{
 		filters: filters,
 	}
 }
 
-func removeListener(id string) {
+func removeListener(conn *websocket.Conn, id string) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()
 	}()
 
-	delete(listeners, id)
+	subs, ok := listeners[conn]
+	if ok {
+		delete(listeners[conn], id)
+		if len(subs) == 0 {
+			delete(listeners, conn)
+		}
+	}
 }
 
 func notifyListeners(event *event.Event) {
@@ -43,11 +53,12 @@ func notifyListeners(event *event.Event) {
 		listenersMutex.Unlock()
 	}()
 
-	for id, listener := range listeners {
-		if !listener.filters.Match(event) {
-			continue
+	for conn, subs := range listeners {
+		for id, listener := range subs {
+			if !listener.filters.Match(event) {
+				continue
+			}
+			conn.WriteJSON([]interface{}{"EVENT", id, event})
 		}
-
-		listener.ws.WriteJSON([]interface{}{"EVENT", id, event})
 	}
 }
