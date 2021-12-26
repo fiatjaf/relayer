@@ -1,4 +1,4 @@
-package main
+package relayer
 
 import (
 	"net/http"
@@ -6,9 +6,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/reflectx"
-	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 )
@@ -16,32 +13,22 @@ import (
 type Settings struct {
 	Host string `envconfig:"HOST" default:"0.0.0.0"`
 	Port string `envconfig:"PORT" default:"7447"`
-
-	PostgresDatabase string `envconfig:"POSTGRESQL_DATABASE"`
 }
 
 var s Settings
-var err error
-var db *sqlx.DB
 var log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 var router = mux.NewRouter()
 
-func main() {
-	err = envconfig.Process("", &s)
-	if err != nil {
-		log.Fatal().Err(err).Msg("couldn't process envconfig")
-	}
+func Start(relay Relay) {
+	Log = log.With().Str("name", relay.Name()).Logger()
 
-	db, err = initDB()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to open database")
+	if err := relay.Init(); err != nil {
+		Log.Fatal().Err(err).Msg("failed to start")
 	}
-	db.Mapper = reflectx.NewMapperFunc("json", sqlx.NameMapper)
-
-	go cleanupRoutine()
 
 	// NIP01
-	router.Path("/").Methods("GET").HandlerFunc(handleWebsocket)
+	router.Path("/").Methods("GET").HandlerFunc(handleWebsocket(relay))
 
 	srv := &http.Server{
 		Handler:           cors.Default().Handler(router),

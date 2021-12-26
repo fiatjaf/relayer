@@ -9,9 +9,12 @@ import (
 
 	"github.com/fiatjaf/go-nostr/event"
 	"github.com/fiatjaf/go-nostr/filter"
+	"github.com/rs/zerolog/log"
 )
 
-func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
+func (b *BasicRelay) QueryEvents(
+	filter *filter.EventFilter,
+) (events []event.Event, err error) {
 	var conditions []string
 	var params []interface{}
 
@@ -69,11 +72,11 @@ func queryEvents(filter *filter.EventFilter) (events []event.Event, err error) {
 		conditions = append(conditions, "true")
 	}
 
-	query := db.Rebind("SELECT * FROM event WHERE " +
+	query := b.DB.Rebind("SELECT * FROM event WHERE " +
 		strings.Join(conditions, " AND ") +
 		" ORDER BY created_at LIMIT 100")
 
-	err = db.Select(&events, query, params...)
+	err = b.DB.Select(&events, query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		log.Warn().Err(err).Interface("filter", filter).Msg("failed to fetch events")
 		err = fmt.Errorf("failed to fetch events: %w", err)

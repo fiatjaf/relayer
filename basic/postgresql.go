@@ -3,10 +3,11 @@ package main
 import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/rs/zerolog/log"
 )
 
-func initDB() (*sqlx.DB, error) {
-	db, err := sqlx.Connect("postgres", s.PostgresDatabase)
+func initDB(dburl string) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres", dburl)
 	if err != nil {
 		return nil, err
 	}
