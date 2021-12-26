@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 )
@@ -21,6 +22,10 @@ var log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
 var router = mux.NewRouter()
 
 func Start(relay Relay) {
+	if err := envconfig.Process("", &s); err != nil {
+		log.Panic().Err(err).Msg("couldn't process envconfig")
+	}
+
 	Log = log.With().Str("name", relay.Name()).Logger()
 
 	if err := relay.Init(); err != nil {
