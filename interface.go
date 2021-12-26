@@ -13,3 +13,7 @@ type Relay interface {
 	SaveEvent(*event.Event) error
 	QueryEvents(*filter.EventFilter) ([]event.Event, error)
 }
+
+type Injector interface {
+	InjectEvents() chan event.Event
+}

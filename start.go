@@ -27,8 +27,15 @@ func Start(relay Relay) {
 		Log.Fatal().Err(err).Msg("failed to start")
 	}
 
-	// NIP01
 	router.Path("/").Methods("GET").HandlerFunc(handleWebsocket(relay))
+
+	if inj, ok := relay.(Injector); ok {
+		go func() {
+			for event := range inj.InjectEvents() {
+				notifyListeners(&event)
+			}
+		}()
+	}
 
 	srv := &http.Server{
 		Handler:           cors.Default().Handler(router),
