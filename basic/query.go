@@ -67,6 +67,11 @@ func (b *BasicRelay) QueryEvents(
 		params = append(params, filter.Since)
 	}
 
+	if filter.Until != 0 {
+		conditions = append(conditions, "created_at < ?")
+		params = append(params, filter.Until)
+	}
+
 	if len(conditions) == 0 {
 		// fallback
 		conditions = append(conditions, "true")
