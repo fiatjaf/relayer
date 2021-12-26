@@ -19,7 +19,7 @@ type Settings struct {
 var s Settings
 var log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-var router = mux.NewRouter()
+var Router = mux.NewRouter()
 
 func Start(relay Relay) {
 	if err := envconfig.Process("", &s); err != nil {
@@ -32,7 +32,8 @@ func Start(relay Relay) {
 		Log.Fatal().Err(err).Msg("failed to start")
 	}
 
-	router.Path("/").Methods("GET").HandlerFunc(handleWebsocket(relay))
+	Router.Path("/").Methods("GET").Headers("Upgrade", "websocket").
+		HandlerFunc(handleWebsocket(relay))
 
 	if inj, ok := relay.(Injector); ok {
 		go func() {
@@ -43,7 +44,7 @@ func Start(relay Relay) {
 	}
 
 	srv := &http.Server{
-		Handler:           cors.Default().Handler(router),
+		Handler:           cors.Default().Handler(Router),
 		Addr:              s.Host + ":" + s.Port,
 		WriteTimeout:      2 * time.Second,
 		ReadTimeout:       2 * time.Second,
