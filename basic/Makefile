@@ -1,4 +1,4 @@
-relayer: $(shell find . -name "*.go")
+relayer: $(shell find .. -name "*.go")
 	go build -ldflags="-s -w" -o ./relayer
 
 deploy: relayer
