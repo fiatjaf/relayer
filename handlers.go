@@ -39,10 +39,12 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 			log.Warn().Err(err).Msg("failed to upgrade websocket")
 			return
 		}
+		ticker := time.NewTicker(pingPeriod)
 
 		// reader
 		go func() {
 			defer func() {
+				ticker.Stop()
 				conn.Close()
 			}()
 
@@ -170,7 +172,6 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 
 		// writer
 		go func() {
-			ticker := time.NewTicker(pingPeriod)
 			defer func() {
 				ticker.Stop()
 				conn.Close()
