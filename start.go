@@ -22,19 +22,23 @@ var log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
 var Router = mux.NewRouter()
 
 func Start(relay Relay) {
+	// read host/port (implementations can read other stuff on their own if they need)
 	if err := envconfig.Process("", &s); err != nil {
 		log.Panic().Err(err).Msg("couldn't process envconfig")
 	}
 
+	// expose this Log instance so implementations can use it
 	Log = log.With().Str("name", relay.Name()).Logger()
 
+	// catch the websocket call before anything else
+	Router.Path("/").Headers("Upgrade", "websocket").HandlerFunc(handleWebsocket(relay))
+
+	// allow implementations to do initialization stuff
 	if err := relay.Init(); err != nil {
 		Log.Fatal().Err(err).Msg("failed to start")
 	}
 
-	Router.Path("/").Methods("GET").Headers("Upgrade", "websocket").
-		HandlerFunc(handleWebsocket(relay))
-
+	// wait for events to come from implementations, if this is implemented
 	if inj, ok := relay.(Injector); ok {
 		go func() {
 			for event := range inj.InjectEvents() {
@@ -43,6 +47,7 @@ func Start(relay Relay) {
 		}()
 	}
 
+	// start http server
 	srv := &http.Server{
 		Handler:           cors.Default().Handler(Router),
 		Addr:              s.Host + ":" + s.Port,
