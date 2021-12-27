@@ -4,8 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -71,22 +69,21 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 				}
 
 				go func(message []byte) {
-					var err error
-
+					var notice string
 					defer func() {
-						if err != nil {
-							conn.WriteJSON([]interface{}{"NOTICE", err.Error()})
+						if notice != "" {
+							conn.WriteJSON([]interface{}{"NOTICE", notice})
 						}
 					}()
 
 					var request []json.RawMessage
-					err = json.Unmarshal(message, &request)
-					if err == nil && len(request) < 2 {
-						err = errors.New("request has less than 2 parameters")
+					if err := json.Unmarshal(message, &request); err != nil {
+						// stop silently
 						return
 					}
-					if err != nil {
-						err = nil
+
+					if len(request) < 2 {
+						notice = "request has less than 2 parameters"
 						return
 					}
 
@@ -97,9 +94,8 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 					case "EVENT":
 						// it's a new event
 						var evt event.Event
-						err := json.Unmarshal(request[1], &evt)
-						if err != nil {
-							err = fmt.Errorf("failed to decode event: %w", err)
+						if err := json.Unmarshal(request[1], &evt); err != nil {
+							notice = "failed to decode event: " + err.Error()
 							return
 						}
 
@@ -112,15 +108,16 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 
 						// check signature (requires the ID to be set)
 						if ok, err := evt.CheckSignature(); err != nil {
-							err = errors.New("signature verification error")
+							notice = "signature verification error"
 							return
 						} else if !ok {
-							err = errors.New("signature invalid")
+							notice = "signature invalid"
 							return
 						}
 
 						err = relay.SaveEvent(&evt)
 						if err != nil {
+							notice = err.Error()
 							return
 						}
 
@@ -129,14 +126,17 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 						var id string
 						json.Unmarshal(request[1], &id)
 						if id == "" {
-							err = errors.New("REQ has no <id>")
+							notice = "REQ has no <id>"
 							return
 						}
 
 						filters := make(filter.EventFilters, len(request)-2)
 						for i, filterReq := range request[2:] {
-							err = json.Unmarshal(filterReq, &filters[i])
-							if err != nil {
+							if err := json.Unmarshal(
+								filterReq,
+								&filters[i],
+							); err != nil {
+								notice = "failed to decode filter"
 								return
 							}
 
@@ -154,11 +154,15 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 						var id string
 						json.Unmarshal(request[0], &id)
 						if id == "" {
-							err = errors.New("CLOSE has no <id>")
+							notice = "CLOSE has no <id>"
 							return
 						}
 
 						removeListener(conn, id)
+
+					default:
+						notice = "unknown message type " + typ
+						return
 					}
 				}(message)
 			}
