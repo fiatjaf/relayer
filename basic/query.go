@@ -28,28 +28,27 @@ func (b *BasicRelay) QueryEvents(
 		params = append(params, filter.ID)
 	}
 
-	if filter.Kind != nil && *filter.Kind != 0 {
+	if filter.Kind != nil {
 		conditions = append(conditions, "kind = ?")
 		params = append(params, filter.Kind)
 	}
 
 	if filter.Authors != nil {
-		if len(filter.Authors) == 0 {
+		inkeys := make([]string, 0, len(filter.Authors))
+		for _, key := range filter.Authors {
+			// to prevent sql attack here we will check if
+			// these keys are valid 32byte hex
+			parsed, err := hex.DecodeString(key)
+			if err != nil || len(parsed) != 32 {
+				continue
+			}
+			inkeys = append(inkeys, fmt.Sprintf("'%x'", parsed))
+		}
+		if len(inkeys) == 0 {
 			// authors being [] means you won't get anything
 			return
-		} else {
-			inkeys := make([]string, 0, len(filter.Authors))
-			for _, key := range filter.Authors {
-				// to prevent sql attack here we will check if
-				// these keys are valid 32byte hex
-				parsed, err := hex.DecodeString(key)
-				if err != nil || len(parsed) != 32 {
-					continue
-				}
-				inkeys = append(inkeys, fmt.Sprintf("'%x'", parsed))
-			}
-			conditions = append(conditions, `pubkey IN (`+strings.Join(inkeys, ",")+`)`)
 		}
+		conditions = append(conditions, `pubkey IN (`+strings.Join(inkeys, ",")+`)`)
 	}
 
 	if filter.TagEvent != "" {
