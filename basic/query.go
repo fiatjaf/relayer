@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/fiatjaf/go-nostr/event"
@@ -23,14 +24,22 @@ func (b *BasicRelay) QueryEvents(
 		return
 	}
 
-	if filter.ID != "" {
-		conditions = append(conditions, "id = ?")
-		params = append(params, filter.ID)
-	}
-
-	if filter.Kind != nil {
-		conditions = append(conditions, "kind = ?")
-		params = append(params, filter.Kind)
+	if filter.IDs != nil {
+		inids := make([]string, 0, len(filter.IDs))
+		for _, id := range filter.IDs {
+			// to prevent sql attack here we will check if
+			// these ids are valid 32byte hex
+			parsed, err := hex.DecodeString(id)
+			if err != nil || len(parsed) != 32 {
+				continue
+			}
+			inids = append(inids, fmt.Sprintf("'%x'", parsed))
+		}
+		if len(inids) == 0 {
+			// ids being [] mean you won't get anything
+			return
+		}
+		conditions = append(conditions, `id IN (`+strings.Join(inids, ",")+`)`)
 	}
 
 	if filter.Authors != nil {
@@ -45,20 +54,49 @@ func (b *BasicRelay) QueryEvents(
 			inkeys = append(inkeys, fmt.Sprintf("'%x'", parsed))
 		}
 		if len(inkeys) == 0 {
-			// authors being [] means you won't get anything
+			// authors being [] mean you won't get anything
 			return
 		}
 		conditions = append(conditions, `pubkey IN (`+strings.Join(inkeys, ",")+`)`)
 	}
 
-	if filter.TagEvent != "" {
-		conditions = append(conditions, tagConditions)
-		params = append(params, filter.TagEvent)
+	if filter.Kinds != nil {
+		if len(filter.Kinds) == 0 {
+			// kinds being [] mean you won't get anything
+			return
+		}
+		// no sql injection issues since these are ints
+		inkinds := make([]string, len(filter.Kinds))
+		for i, kind := range filter.Kinds {
+			inkinds[i] = strconv.Itoa(kind)
+		}
+		conditions = append(conditions, `kind IN (`+strings.Join(inkinds, ",")+`)`)
 	}
 
-	if filter.TagProfile != "" {
-		conditions = append(conditions, tagConditions)
-		params = append(params, filter.TagProfile)
+	if filter.TagE != nil {
+		if len(filter.TagE) == 0 {
+			// #e being [] mean you won't get anything
+			return
+		}
+		innerConditions := make([]string, len(filter.TagE))
+		for _, e := range filter.TagE {
+			innerConditions = append(innerConditions, tagConditions)
+			params = append(params, e)
+		}
+		conditions = append(conditions, strings.Join(innerConditions, " OR "))
+	}
+
+	if filter.TagP != nil {
+		if len(filter.TagP) == 0 {
+			// #p being [] mean you won't get anything
+			return
+		}
+		innerConditions := make([]string, len(filter.TagP))
+		for _, p := range filter.TagP {
+			innerConditions = append(innerConditions, tagConditions)
+			params = append(params, p)
+		}
+		conditions = append(conditions, strings.Join(innerConditions, " OR "))
 	}
 
 	if filter.Since != 0 {
