@@ -136,7 +136,9 @@ func (b *BasicRelay) QueryEvents(
 		conditions = append(conditions, "true")
 	}
 
-	query := b.DB.Rebind("SELECT * FROM event WHERE " +
+	query := b.DB.Rebind(`SELECT
+      id, pubkey, created_at, kind, tags, content, sig
+    FROM event WHERE ` +
 		strings.Join(conditions, " AND ") +
 		" ORDER BY created_at LIMIT 100")
 
