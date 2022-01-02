@@ -87,40 +87,38 @@ func (b *BasicRelay) QueryEvents(
 		conditions = append(conditions, `kind IN (`+strings.Join(inkinds, ",")+`)`)
 	}
 
+	tagQuery := make([]string, 0, 1)
 	if filter.TagE != nil {
 		if len(filter.TagE) > 10 {
 			// too many tags, fail everything
 			return
 		}
-
 		if len(filter.TagE) == 0 {
 			// #e being [] mean you won't get anything
 			return
 		}
-		innerConditions := make([]string, len(filter.TagE))
-		for _, e := range filter.TagE {
-			innerConditions = append(innerConditions, tagConditions)
-			params = append(params, e)
-		}
-		conditions = append(conditions, strings.Join(innerConditions, " OR "))
+		tagQuery = append(tagQuery, filter.TagE...)
 	}
-
 	if filter.TagP != nil {
 		if len(filter.TagP) > 10 {
 			// too many tags, fail everything
 			return
 		}
-
 		if len(filter.TagP) == 0 {
-			// #p being [] mean you won't get anything
+			// #e being [] mean you won't get anything
 			return
 		}
-		innerConditions := make([]string, len(filter.TagP))
-		for _, p := range filter.TagP {
-			innerConditions = append(innerConditions, tagConditions)
-			params = append(params, p)
+		tagQuery = append(tagQuery, filter.TagP...)
+	}
+
+	if len(tagQuery) > 0 {
+		arrayBuild := make([]string, len(tagQuery))
+		for i, tagValue := range tagQuery {
+			arrayBuild[i] = "?"
+			params = append(params, tagValue)
 		}
-		conditions = append(conditions, strings.Join(innerConditions, " OR "))
+		conditions = append(conditions,
+			"tagvalues && ARRAY["+strings.Join(arrayBuild, ",")+"]")
 	}
 
 	if filter.Since != 0 {
