@@ -28,7 +28,7 @@ func GetListeningFilters() nostr.EventFilters {
 			for _, listenerfilter := range listener.filters {
 				for _, respfilter := range respfilters {
 					// check if this filter specifically is already added to respfilters
-					if nostr.Equal(listenerfilter, respfilter) {
+					if nostr.FilterEqual(listenerfilter, respfilter) {
 						goto nextconn
 					}
 				}
