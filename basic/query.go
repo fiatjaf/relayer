@@ -144,7 +144,8 @@ func (b *BasicRelay) QueryEvents(
 
 	err = b.DB.Select(&events, query, params...)
 	if err != nil && err != sql.ErrNoRows {
-		log.Warn().Err(err).Interface("filter", filter).Msg("failed to fetch events")
+		log.Warn().Err(err).Interface("filter", filter).Str("query", query).
+			Msg("failed to fetch events")
 		err = fmt.Errorf("failed to fetch events: %w", err)
 	}
 
