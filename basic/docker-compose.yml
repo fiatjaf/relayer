@@ -1,0 +1,32 @@
+version: "3.8"
+services:
+
+  relay:
+    build:
+      context: ../
+      dockerfile: ./basic/Dockerfile
+    environment:
+      PORT: 2700
+      POSTGRESQL_DATABASE: postgres://nostr:nostr@postgres:5432/nostr?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - 2700:2700
+    command: "./basic/relayer"
+
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: nostr
+      POSTGRES_USER: nostr
+      POSTGRES_PASSWORD: nostr
+      POSTGRES_HOST_AUTH_METHOD: trust # allow all connections without a password. This is *not* recommended for prod
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nostr"] # database username here - nostr, should be changed if other user
+      interval: 10s
+      timeout: 5s
+      retries: 5
