@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fiatjaf/go-nostr/event"
-	"github.com/fiatjaf/go-nostr/filter"
+	"github.com/fiatjaf/go-nostr"
 	"github.com/gorilla/websocket"
 )
 
@@ -95,7 +94,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 					switch typ {
 					case "EVENT":
 						// it's a new event
-						var evt event.Event
+						var evt nostr.Event
 						if err := json.Unmarshal(request[1], &evt); err != nil {
 							notice = "failed to decode event: " + err.Error()
 							return
@@ -132,7 +131,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							return
 						}
 
-						filters := make(filter.EventFilters, len(request)-2)
+						filters := make(nostr.EventFilters, len(request)-2)
 						for i, filterReq := range request[2:] {
 							if err := json.Unmarshal(
 								filterReq,

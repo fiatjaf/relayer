@@ -3,20 +3,19 @@ package relayer
 import (
 	"sync"
 
-	"github.com/fiatjaf/go-nostr/event"
-	"github.com/fiatjaf/go-nostr/filter"
+	"github.com/fiatjaf/go-nostr"
 	"github.com/gorilla/websocket"
 )
 
 type Listener struct {
-	filters filter.EventFilters
+	filters nostr.EventFilters
 }
 
 var listeners = make(map[*websocket.Conn]map[string]*Listener)
 var listenersMutex = sync.Mutex{}
 
-func GetListeningFilters() filter.EventFilters {
-	var respfilters = make(filter.EventFilters, 0, len(listeners)*2)
+func GetListeningFilters() nostr.EventFilters {
+	var respfilters = make(nostr.EventFilters, 0, len(listeners)*2)
 
 	listenersMutex.Lock()
 	defer func() {
@@ -29,7 +28,7 @@ func GetListeningFilters() filter.EventFilters {
 			for _, listenerfilter := range listener.filters {
 				for _, respfilter := range respfilters {
 					// check if this filter specifically is already added to respfilters
-					if filter.Equal(listenerfilter, respfilter) {
+					if nostr.Equal(listenerfilter, respfilter) {
 						goto nextconn
 					}
 				}
@@ -48,7 +47,7 @@ func GetListeningFilters() filter.EventFilters {
 	return respfilters
 }
 
-func setListener(id string, conn *websocket.Conn, filters filter.EventFilters) {
+func setListener(id string, conn *websocket.Conn, filters nostr.EventFilters) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()
@@ -80,7 +79,7 @@ func removeListener(conn *websocket.Conn, id string) {
 	}
 }
 
-func notifyListeners(event *event.Event) {
+func notifyListeners(event *nostr.Event) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()

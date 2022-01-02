@@ -1,8 +1,7 @@
 package relayer
 
 import (
-	"github.com/fiatjaf/go-nostr/event"
-	"github.com/fiatjaf/go-nostr/filter"
+	"github.com/fiatjaf/go-nostr"
 )
 
 var Log = log
@@ -10,10 +9,10 @@ var Log = log
 type Relay interface {
 	Name() string
 	Init() error
-	SaveEvent(*event.Event) error
-	QueryEvents(*filter.EventFilter) ([]event.Event, error)
+	SaveEvent(*nostr.Event) error
+	QueryEvents(*nostr.EventFilter) ([]nostr.Event, error)
 }
 
 type Injector interface {
-	InjectEvents() chan event.Event
+	InjectEvents() chan nostr.Event
 }

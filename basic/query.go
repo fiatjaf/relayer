@@ -8,14 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fiatjaf/go-nostr/event"
-	"github.com/fiatjaf/go-nostr/filter"
+	"github.com/fiatjaf/go-nostr"
 	"github.com/rs/zerolog/log"
 )
 
 func (b *BasicRelay) QueryEvents(
-	filter *filter.EventFilter,
-) (events []event.Event, err error) {
+	filter *nostr.EventFilter,
+) (events []nostr.Event, err error) {
 	var conditions []string
 	var params []interface{}
 

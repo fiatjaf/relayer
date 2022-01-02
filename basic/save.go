@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fiatjaf/go-nostr/event"
+	"github.com/fiatjaf/go-nostr"
 )
 
-func (b *BasicRelay) SaveEvent(evt *event.Event) error {
+func (b *BasicRelay) SaveEvent(evt *nostr.Event) error {
 	// disallow large contents
 	if len(evt.Content) > 1000 {
 		return errors.New("event content too large")
@@ -17,14 +17,14 @@ func (b *BasicRelay) SaveEvent(evt *event.Event) error {
 
 	// react to different kinds of events
 	switch evt.Kind {
-	case event.KindSetMetadata:
+	case nostr.KindSetMetadata:
 		// delete past set_metadata events from this user
 		b.DB.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 0`, evt.PubKey)
-	case event.KindRecommendServer:
+	case nostr.KindRecommendServer:
 		// delete past recommend_server events equal to this one
 		b.DB.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 2 AND content = $2`,
 			evt.PubKey, evt.Content)
-	case event.KindContactList:
+	case nostr.KindContactList:
 		// delete past contact lists from this same pubkey
 		b.DB.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = 3`, evt.PubKey)
 	default:
