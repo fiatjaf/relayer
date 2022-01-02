@@ -25,6 +25,11 @@ func (b *BasicRelay) QueryEvents(
 	}
 
 	if filter.IDs != nil {
+		if len(filter.IDs) > 500 {
+			// too many ids, fail everything
+			return
+		}
+
 		inids := make([]string, 0, len(filter.IDs))
 		for _, id := range filter.IDs {
 			// to prevent sql attack here we will check if
@@ -43,6 +48,11 @@ func (b *BasicRelay) QueryEvents(
 	}
 
 	if filter.Authors != nil {
+		if len(filter.Authors) > 500 {
+			// too many authors, fail everything
+			return
+		}
+
 		inkeys := make([]string, 0, len(filter.Authors))
 		for _, key := range filter.Authors {
 			// to prevent sql attack here we will check if
@@ -61,6 +71,11 @@ func (b *BasicRelay) QueryEvents(
 	}
 
 	if filter.Kinds != nil {
+		if len(filter.Kinds) > 10 {
+			// too many kinds, fail everything
+			return
+		}
+
 		if len(filter.Kinds) == 0 {
 			// kinds being [] mean you won't get anything
 			return
@@ -74,6 +89,11 @@ func (b *BasicRelay) QueryEvents(
 	}
 
 	if filter.TagE != nil {
+		if len(filter.TagE) > 10 {
+			// too many tags, fail everything
+			return
+		}
+
 		if len(filter.TagE) == 0 {
 			// #e being [] mean you won't get anything
 			return
@@ -87,6 +107,11 @@ func (b *BasicRelay) QueryEvents(
 	}
 
 	if filter.TagP != nil {
+		if len(filter.TagP) > 10 {
+			// too many tags, fail everything
+			return
+		}
+
 		if len(filter.TagP) == 0 {
 			// #p being [] mean you won't get anything
 			return
