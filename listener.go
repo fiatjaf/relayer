@@ -4,14 +4,13 @@ import (
 	"sync"
 
 	"github.com/fiatjaf/go-nostr"
-	"github.com/gorilla/websocket"
 )
 
 type Listener struct {
 	filters nostr.EventFilters
 }
 
-var listeners = make(map[*websocket.Conn]map[string]*Listener)
+var listeners = make(map[*WebSocket]map[string]*Listener)
 var listenersMutex = sync.Mutex{}
 
 func GetListeningFilters() nostr.EventFilters {
@@ -47,16 +46,16 @@ func GetListeningFilters() nostr.EventFilters {
 	return respfilters
 }
 
-func setListener(id string, conn *websocket.Conn, filters nostr.EventFilters) {
+func setListener(id string, ws *WebSocket, filters nostr.EventFilters) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()
 	}()
 
-	subs, ok := listeners[conn]
+	subs, ok := listeners[ws]
 	if !ok {
 		subs = make(map[string]*Listener)
-		listeners[conn] = subs
+		listeners[ws] = subs
 	}
 
 	subs[id] = &Listener{
@@ -64,17 +63,17 @@ func setListener(id string, conn *websocket.Conn, filters nostr.EventFilters) {
 	}
 }
 
-func removeListener(conn *websocket.Conn, id string) {
+func removeListener(ws *WebSocket, id string) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()
 	}()
 
-	subs, ok := listeners[conn]
+	subs, ok := listeners[ws]
 	if ok {
-		delete(listeners[conn], id)
+		delete(listeners[ws], id)
 		if len(subs) == 0 {
-			delete(listeners, conn)
+			delete(listeners, ws)
 		}
 	}
 }
@@ -85,12 +84,12 @@ func notifyListeners(event *nostr.Event) {
 		listenersMutex.Unlock()
 	}()
 
-	for conn, subs := range listeners {
+	for ws, subs := range listeners {
 		for id, listener := range subs {
 			if !listener.filters.Match(event) {
 				continue
 			}
-			conn.WriteJSON([]interface{}{"EVENT", id, event})
+			ws.WriteJSON([]interface{}{"EVENT", id, event})
 		}
 	}
 }

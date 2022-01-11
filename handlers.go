@@ -40,6 +40,8 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 		}
 		ticker := time.NewTicker(pingPeriod)
 
+		ws := &WebSocket{conn: conn}
+
 		// reader
 		go func() {
 			defer func() {
@@ -65,7 +67,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 				}
 
 				if typ == websocket.PingMessage {
-					conn.WriteMessage(websocket.PongMessage, nil)
+					ws.WriteMessage(websocket.PongMessage, nil)
 					continue
 				}
 
@@ -73,7 +75,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 					var notice string
 					defer func() {
 						if notice != "" {
-							conn.WriteJSON([]interface{}{"NOTICE", notice})
+							ws.WriteJSON([]interface{}{"NOTICE", notice})
 						}
 					}()
 
@@ -123,6 +125,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 						}
 
 						notifyListeners(&evt)
+						break
 					case "REQ":
 						var id string
 						json.Unmarshal(request[1], &id)
@@ -144,13 +147,13 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							events, err := relay.QueryEvents(&filters[i])
 							if err == nil {
 								for _, event := range events {
-									conn.WriteJSON([]interface{}{"EVENT", id, event})
+									ws.WriteJSON([]interface{}{"EVENT", id, event})
 								}
 							}
 						}
 
-						setListener(id, conn, filters)
-
+						setListener(id, ws, filters)
+						break
 					case "CLOSE":
 						var id string
 						json.Unmarshal(request[0], &id)
@@ -159,8 +162,8 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							return
 						}
 
-						removeListener(conn, id)
-
+						removeListener(ws, id)
+						break
 					default:
 						notice = "unknown message type " + typ
 						return
@@ -179,7 +182,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 			for {
 				select {
 				case <-ticker.C:
-					err := conn.WriteMessage(websocket.PingMessage, nil)
+					err := ws.WriteMessage(websocket.PingMessage, nil)
 					if err != nil {
 						log.Warn().Err(err).Msg("error writing ping, closing websocket")
 						return
