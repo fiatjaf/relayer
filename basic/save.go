@@ -48,7 +48,7 @@ func (b *BasicRelay) SaveEvent(evt *nostr.Event) error {
 			return nil
 		}
 
-		return fmt.Errorf("failed to save event from %s", evt.PubKey)
+		return fmt.Errorf("failed to save event %s: %w", evt.ID, err)
 	}
 
 	return nil
