@@ -134,7 +134,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							return
 						}
 
-						filters := make(nostr.EventFilters, len(request)-2)
+						filters := make(nostr.Filters, len(request)-2)
 						for i, filterReq := range request[2:] {
 							if err := json.Unmarshal(
 								filterReq,

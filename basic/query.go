@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fiatjaf/go-nostr"
 	"github.com/rs/zerolog/log"
 )
 
-func (b *BasicRelay) QueryEvents(
-	filter *nostr.EventFilter,
-) (events []nostr.Event, err error) {
+func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error) {
 	var conditions []string
 	var params []interface{}
 
@@ -88,27 +87,19 @@ func (b *BasicRelay) QueryEvents(
 	}
 
 	tagQuery := make([]string, 0, 1)
-	if filter.TagE != nil {
-		if len(filter.TagE) > 10 {
+	for _, values := range filter.Tags {
+		if len(values) == 0 {
+			// any tag set to [] is wrong
+			return
+		}
+
+		// add these tags to the query
+		tagQuery = append(tagQuery, values...)
+
+		if len(tagQuery) > 10 {
 			// too many tags, fail everything
 			return
 		}
-		if len(filter.TagE) == 0 {
-			// #e being [] mean you won't get anything
-			return
-		}
-		tagQuery = append(tagQuery, filter.TagE...)
-	}
-	if filter.TagP != nil {
-		if len(filter.TagP) > 10 {
-			// too many tags, fail everything
-			return
-		}
-		if len(filter.TagP) == 0 {
-			// #e being [] mean you won't get anything
-			return
-		}
-		tagQuery = append(tagQuery, filter.TagP...)
 	}
 
 	if len(tagQuery) > 0 {
@@ -117,18 +108,21 @@ func (b *BasicRelay) QueryEvents(
 			arrayBuild[i] = "?"
 			params = append(params, tagValue)
 		}
+
+		// we use a very bad implementation in which we only check the tag values and
+		// ignore the tag names
 		conditions = append(conditions,
 			"tagvalues && ARRAY["+strings.Join(arrayBuild, ",")+"]")
 	}
 
-	if filter.Since != 0 {
+	aLongTimeAgo := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
+	if filter.Since.Before(aLongTimeAgo) {
 		conditions = append(conditions, "created_at > ?")
-		params = append(params, filter.Since)
+		params = append(params, filter.Since.Unix())
 	}
-
-	if filter.Until != 0 {
+	if filter.Until.Before(aLongTimeAgo) {
 		conditions = append(conditions, "created_at < ?")
-		params = append(params, filter.Until)
+		params = append(params, filter.Until.Unix())
 	}
 
 	if len(conditions) == 0 {

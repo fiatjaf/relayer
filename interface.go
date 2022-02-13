@@ -10,7 +10,7 @@ type Relay interface {
 	Name() string
 	Init() error
 	SaveEvent(*nostr.Event) error
-	QueryEvents(*nostr.EventFilter) ([]nostr.Event, error)
+	QueryEvents(*nostr.Filter) ([]nostr.Event, error)
 }
 
 type Injector interface {

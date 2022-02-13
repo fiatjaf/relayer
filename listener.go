@@ -7,14 +7,14 @@ import (
 )
 
 type Listener struct {
-	filters nostr.EventFilters
+	filters nostr.Filters
 }
 
 var listeners = make(map[*WebSocket]map[string]*Listener)
 var listenersMutex = sync.Mutex{}
 
-func GetListeningFilters() nostr.EventFilters {
-	var respfilters = make(nostr.EventFilters, 0, len(listeners)*2)
+func GetListeningFilters() nostr.Filters {
+	var respfilters = make(nostr.Filters, 0, len(listeners)*2)
 
 	listenersMutex.Lock()
 	defer func() {
@@ -46,7 +46,7 @@ func GetListeningFilters() nostr.EventFilters {
 	return respfilters
 }
 
-func setListener(id string, ws *WebSocket, filters nostr.EventFilters) {
+func setListener(id string, ws *WebSocket, filters nostr.Filters) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()
