@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/fiatjaf/go-nostr"
 	"github.com/rs/zerolog/log"
@@ -115,12 +114,11 @@ func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, er
 			"tagvalues && ARRAY["+strings.Join(arrayBuild, ",")+"]")
 	}
 
-	aLongTimeAgo := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
-	if filter.Since.Before(aLongTimeAgo) {
+	if filter.Since != nil {
 		conditions = append(conditions, "created_at > ?")
 		params = append(params, filter.Since.Unix())
 	}
-	if filter.Until.Before(aLongTimeAgo) {
+	if filter.Until != nil {
 		conditions = append(conditions, "created_at < ?")
 		params = append(params, filter.Until.Unix())
 	}
