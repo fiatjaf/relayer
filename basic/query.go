@@ -134,12 +134,22 @@ func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, er
 		strings.Join(conditions, " AND ") +
 		" ORDER BY created_at LIMIT 100")
 
-	err = b.DB.Select(&events, query, params...)
+	rows, err := b.DB.Query(query, params...)
 	if err != nil && err != sql.ErrNoRows {
 		log.Warn().Err(err).Interface("filter", filter).Str("query", query).
 			Msg("failed to fetch events")
-		err = fmt.Errorf("failed to fetch events: %w", err)
+		return nil, fmt.Errorf("failed to fetch events: %w", err)
 	}
 
-	return
+	for rows.Next() {
+		var evt nostr.Event
+		err := rows.Scan(&evt.ID, &evt.PubKey, &evt.CreatedAt,
+			&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		events = append(events, evt)
+	}
+
+	return events, nil
 }
