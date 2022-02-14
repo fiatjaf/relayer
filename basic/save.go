@@ -41,7 +41,7 @@ func (b *BasicRelay) SaveEvent(evt *nostr.Event) error {
 	_, err := b.DB.Exec(`
         INSERT INTO event (id, pubkey, created_at, kind, tags, content, sig)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, evt.ID, evt.PubKey, evt.CreatedAt, evt.Kind, tagsj, evt.Content, evt.Sig)
+    `, evt.ID, evt.PubKey, evt.CreatedAt.Unix(), evt.Kind, tagsj, evt.Content, evt.Sig)
 	if err != nil {
 		if strings.Index(err.Error(), "UNIQUE") != -1 {
 			// already exists

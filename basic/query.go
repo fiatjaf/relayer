@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fiatjaf/go-nostr"
 	"github.com/rs/zerolog/log"
@@ -27,21 +28,21 @@ func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, er
 			return
 		}
 
-		inids := make([]string, 0, len(filter.IDs))
+		likeids := make([]string, 0, len(filter.IDs))
 		for _, id := range filter.IDs {
 			// to prevent sql attack here we will check if
 			// these ids are valid 32byte hex
 			parsed, err := hex.DecodeString(id)
-			if err != nil || len(parsed) != 32 {
+			if err != nil || len(parsed) <= 32 {
 				continue
 			}
-			inids = append(inids, fmt.Sprintf("'%x'", parsed))
+			likeids = append(likeids, fmt.Sprintf("id LIKE '%x%%'", parsed))
 		}
-		if len(inids) == 0 {
+		if len(likeids) == 0 {
 			// ids being [] mean you won't get anything
 			return
 		}
-		conditions = append(conditions, `id IN (`+strings.Join(inids, ",")+`)`)
+		conditions = append(conditions, "("+strings.Join(likeids, " OR ")+")")
 	}
 
 	if filter.Authors != nil {
@@ -50,7 +51,7 @@ func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, er
 			return
 		}
 
-		inkeys := make([]string, 0, len(filter.Authors))
+		likekeys := make([]string, 0, len(filter.Authors))
 		for _, key := range filter.Authors {
 			// to prevent sql attack here we will check if
 			// these keys are valid 32byte hex
@@ -58,13 +59,13 @@ func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, er
 			if err != nil || len(parsed) != 32 {
 				continue
 			}
-			inkeys = append(inkeys, fmt.Sprintf("'%x'", parsed))
+			likekeys = append(likekeys, fmt.Sprintf("pubkey LIKE '%x%%'", parsed))
 		}
-		if len(inkeys) == 0 {
+		if len(likekeys) == 0 {
 			// authors being [] mean you won't get anything
 			return
 		}
-		conditions = append(conditions, `pubkey IN (`+strings.Join(inkeys, ",")+`)`)
+		conditions = append(conditions, "("+strings.Join(likekeys, " OR ")+")")
 	}
 
 	if filter.Kinds != nil {
@@ -143,11 +144,13 @@ func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, er
 
 	for rows.Next() {
 		var evt nostr.Event
-		err := rows.Scan(&evt.ID, &evt.PubKey, &evt.CreatedAt,
+		var timestamp int64
+		err := rows.Scan(&evt.ID, &evt.PubKey, &timestamp,
 			&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+		evt.CreatedAt = time.Unix(timestamp, 0)
 		events = append(events, evt)
 	}
 

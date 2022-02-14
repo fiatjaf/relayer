@@ -31,8 +31,10 @@ CREATE TABLE IF NOT EXISTS event (
   tagvalues text[] GENERATED ALWAYS AS (tags_to_tagvalues(tags)) STORED
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS ididx ON event (id);
-CREATE UNIQUE INDEX IF NOT EXISTS pubkeytimeidx ON event (pubkey, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ididx ON event USING btree (id text_pattern_ops);
+CREATE INDEX IF NOT EXISTS pubkeyprefix ON event USING btree (pubkey text_pattern_ops);
+CREATE INDEX IF NOT EXISTS timeidx ON event (created_at);
+CREATE INDEX IF NOT EXISTS kindidx ON event (kind);
 CREATE INDEX IF NOT EXISTS arbitrarytagvalues ON event USING gin (tagvalues);
     `)
 	relayer.Log.Print(err)
