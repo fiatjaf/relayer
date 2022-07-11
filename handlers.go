@@ -150,6 +150,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 									ws.WriteJSON([]interface{}{"EVENT", id, event})
 								}
 							}
+							ws.WriteJSON([]interface{}{"EOSE", id})
 						}
 
 						setListener(id, ws, filters)
