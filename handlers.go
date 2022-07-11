@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fiatjaf/go-nostr"
+	"github.com/fiatjaf/go-nostr/nip11"
 	"github.com/gorilla/websocket"
 )
 
@@ -191,5 +192,27 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 				}
 			}
 		}()
+	}
+}
+
+func handleNIP11(relay Relay) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		info := nip11.RelayInformationDocument{
+			Name:          relay.Name(),
+			Description:   "relay powered by the relayer framework",
+			PubKey:        "~",
+			Contact:       "~",
+			SupportedNIPs: []int{9, 15, 16},
+			Software:      "https://github.com/fiatjaf/relayer",
+			Version:       "~",
+		}
+
+		if ifmer, ok := relay.(Informationer); ok {
+			info = ifmer.GetNIP11InformationDocument()
+		}
+
+		json.NewEncoder(w).Encode(info)
 	}
 }

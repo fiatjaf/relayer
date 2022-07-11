@@ -2,6 +2,7 @@ package relayer
 
 import (
 	"github.com/fiatjaf/go-nostr"
+	"github.com/fiatjaf/go-nostr/nip11"
 )
 
 var Log = log
@@ -15,4 +16,8 @@ type Relay interface {
 
 type Injector interface {
 	InjectEvents() chan nostr.Event
+}
+
+type Informationer interface {
+	GetNIP11InformationDocument() nip11.RelayInformationDocument
 }

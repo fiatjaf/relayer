@@ -16,8 +16,10 @@ type Settings struct {
 	Port string `envconfig:"PORT" default:"7447"`
 }
 
-var s Settings
-var log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+var (
+	s   Settings
+	log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+)
 
 var Router = mux.NewRouter()
 
@@ -32,6 +34,9 @@ func Start(relay Relay) {
 
 	// catch the websocket call before anything else
 	Router.Path("/").Headers("Upgrade", "websocket").HandlerFunc(handleWebsocket(relay))
+
+	// nip-11, relay information
+	Router.Path("/").Headers("Accept", "application/nostr+json").HandlerFunc(handleNIP11(relay))
 
 	// allow implementations to do initialization stuff
 	if err := relay.Init(); err != nil {
