@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -116,6 +117,19 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							return
 						} else if !ok {
 							notice = "signature invalid"
+							return
+						}
+
+						if evt.Kind == 5 {
+							// event deletion -- nip09
+							for _, tag := range evt.Tags {
+								if len(tag) >= 2 && tag[0] == "e" {
+									if err := relay.DeleteEvent(tag[1], evt.PubKey); err != nil {
+										notice = fmt.Sprintf("failed to delete: %s", err.Error())
+										return
+									}
+								}
+							}
 							return
 						}
 

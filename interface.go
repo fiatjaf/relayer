@@ -11,6 +11,7 @@ type Relay interface {
 	Name() string
 	Init() error
 	SaveEvent(*nostr.Event) error
+	DeleteEvent(id string, pubkey string) error
 	QueryEvents(*nostr.Filter) ([]nostr.Event, error)
 }
 
