@@ -15,7 +15,7 @@ import (
 
 func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error) {
 	var conditions []string
-	var params []interface{}
+	var params []any
 
 	if filter == nil {
 		err = errors.New("filter cannot be null")
