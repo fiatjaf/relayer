@@ -24,7 +24,7 @@ type Informationer interface {
 
 type AdvancedQuerier interface {
 	BeforeQuery(*nostr.Filter)
-	AfterQuery(*nostr.Filter)
+	AfterQuery([]nostr.Event, *nostr.Filter)
 }
 
 type AdvancedDeleter interface {

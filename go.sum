@@ -134,8 +134,8 @@ github.com/etcd-io/bbolt v1.3.3/go.mod h1:ZF2nL25h33cCyBtcyWeZ2/I3HQOfTP+0PIEvHj
 github.com/fasthttp-contrib/websocket v0.0.0-20160511215533-1f3b11f56072/go.mod h1:duJ4Jxv5lDcvg4QuQr0oowTf7dz4/CR8NtyCooz9HL8=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
 github.com/fergusstrange/embedded-postgres v1.10.0 h1:YnwF6xAQYmKLAXXrrRx4rHDLih47YJwVPvg8jeKfdNg=
-github.com/fiatjaf/go-nostr v0.7.3 h1:Z95U2qTTj3a41+ybopYjfKZ+bMpNFM43ARA7B4IOYVs=
-github.com/fiatjaf/go-nostr v0.7.3/go.mod h1:pbJCdZzBKPB8wgQDipS5POnOV1afhcFzJUIwJ5qKSrU=
+github.com/fiatjaf/go-nostr v0.7.4 h1:Qtn78VELVlxhbJMtZSn5nNolvnPSH01frfCIGG+znbw=
+github.com/fiatjaf/go-nostr v0.7.4/go.mod h1:pbJCdZzBKPB8wgQDipS5POnOV1afhcFzJUIwJ5qKSrU=
 github.com/flosch/pongo2 v0.0.0-20190707114632-bbf5a6c351f4/go.mod h1:T9YF2M40nIgbVgp3rreNmTged+9HrbNTIQf1PsaIiTA=
 github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=
 github.com/form3tech-oss/jwt-go v3.2.3+incompatible h1:7ZaBxOI7TMoYBfyA3cQHErNNyAWIKUMIwqxEtgHOs5c=

@@ -195,22 +195,28 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 								return
 							}
 
+							filter := &filters[i]
+
 							if advancedQuerier != nil {
-								advancedQuerier.BeforeQuery(&filters[i])
+								advancedQuerier.BeforeQuery(filter)
 							}
 
-							events, err := store.QueryEvents(&filters[i])
+							events, err := store.QueryEvents(filter)
 							if err == nil {
+								if advancedQuerier != nil {
+									advancedQuerier.AfterQuery(events, filter)
+								}
+
+								if filter.Limit > 0 && len(events) > filter.Limit {
+									events = events[0:filter.Limit]
+								}
+
 								for _, event := range events {
 									ws.WriteJSON([]interface{}{"EVENT", id, event})
 								}
-							}
 
-							if advancedQuerier != nil {
-								advancedQuerier.AfterQuery(&filters[i])
+								ws.WriteJSON([]interface{}{"EOSE", id})
 							}
-
-							ws.WriteJSON([]interface{}{"EOSE", id})
 						}
 
 						setListener(id, ws, filters)
