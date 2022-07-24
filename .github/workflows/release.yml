@@ -1,0 +1,43 @@
+name: build all relays for all platforms
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  make-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+  build-all-for-all:
+    runs-on: ubuntu-latest
+    needs:
+      - make-release
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin, freebsd, openbsd]
+        goarch: [amd64, arm64]
+        project: ['basic', 'whitelisted', 'expensive', 'rss-bridge']
+        exclude:
+          - goarch: arm64
+            goos: windows
+    steps:
+      - uses: actions/checkout@v3
+      - uses: wangyoucao577/go-release-action@v1.30
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          goversion: "1.18"
+          project_path: ${{ matrix.project }}
+          binary_name: "relayer-${{ matrix.project }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          overwrite: true
