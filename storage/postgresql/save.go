@@ -1,8 +1,7 @@
-package main
+package postgresql
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,12 +9,7 @@ import (
 	"github.com/fiatjaf/go-nostr"
 )
 
-func (b *BasicRelay) SaveEvent(evt *nostr.Event) error {
-	// disallow large contents
-	if len(evt.Content) > 1000 {
-		return errors.New("event content too large")
-	}
-
+func (b *PostgresBackend) SaveEvent(evt *nostr.Event) error {
 	// react to different kinds of events
 	if evt.Kind == nostr.KindSetMetadata || evt.Kind == nostr.KindContactList || (10000 <= evt.Kind && evt.Kind < 20000) {
 		// delete past events from this user
@@ -24,13 +18,6 @@ func (b *BasicRelay) SaveEvent(evt *nostr.Event) error {
 		// delete past recommend_server events equal to this one
 		b.DB.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = $2 AND content = $3`,
 			evt.PubKey, evt.Kind, evt.Content)
-	} else {
-		// delete all but the 100 most recent ones
-		b.DB.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = $2 AND created_at < (
-          SELECT created_at FROM event WHERE pubkey = $1
-          ORDER BY created_at DESC OFFSET 100 LIMIT 1
-        )`,
-			evt.PubKey, evt.Kind)
 	}
 
 	// insert

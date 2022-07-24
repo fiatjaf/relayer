@@ -1,4 +1,4 @@
-package main
+package postgresql
 
 import (
 	"database/sql"
@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/fiatjaf/go-nostr"
-	"github.com/rs/zerolog/log"
+	"github.com/fiatjaf/relayer"
 )
 
-func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error) {
+func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error) {
 	var conditions []string
 	var params []any
 
@@ -137,7 +137,9 @@ func (b *BasicRelay) QueryEvents(filter *nostr.Filter) (events []nostr.Event, er
 
 	rows, err := b.DB.Query(query, params...)
 	if err != nil && err != sql.ErrNoRows {
-		log.Warn().Err(err).Interface("filter", filter).Str("query", query).
+		relayer.Log.Warn().Err(err).
+			Interface("filter", filter).
+			Str("query", query).
 			Msg("failed to fetch events")
 		return nil, fmt.Errorf("failed to fetch events: %w", err)
 	}

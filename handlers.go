@@ -35,6 +35,11 @@ var upgrader = websocket.Upgrader{
 
 func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		store := relay.Storage()
+		advancedQuerier, _ := store.(AdvancedQuerier)
+		advancedDeleter, _ := store.(AdvancedDeleter)
+		advancedSaver, _ := store.(AdvancedSaver)
+
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to upgrade websocket")
@@ -111,6 +116,18 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 						hash := sha256.Sum256(serialized)
 						evt.ID = hex.EncodeToString(hash[:])
 
+						// block too many indexable tags
+						t := 0
+						for _, tag := range evt.Tags {
+							if len(tag[0]) == 1 {
+								t++
+							}
+						}
+						if t > 3 {
+							notice = "too many indexable tags"
+							return
+						}
+
 						// check signature (requires the ID to be set)
 						if ok, err := evt.CheckSignature(); err != nil {
 							notice = "signature verification error"
@@ -124,19 +141,38 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							// event deletion -- nip09
 							for _, tag := range evt.Tags {
 								if len(tag) >= 2 && tag[0] == "e" {
-									if err := relay.DeleteEvent(tag[1], evt.PubKey); err != nil {
+									if advancedDeleter != nil {
+										advancedDeleter.BeforeDelete(tag[1], evt.PubKey)
+									}
+
+									if err := store.DeleteEvent(tag[1], evt.PubKey); err != nil {
 										notice = fmt.Sprintf("failed to delete: %s", err.Error())
 										return
+									}
+
+									if advancedDeleter != nil {
+										advancedDeleter.AfterDelete(tag[1], evt.PubKey)
 									}
 								}
 							}
 							return
 						}
 
-						err = relay.SaveEvent(&evt)
-						if err != nil {
+						if !relay.AcceptEvent(&evt) {
+							return
+						}
+
+						if advancedSaver != nil {
+							advancedSaver.BeforeSave(&evt)
+						}
+
+						if err := store.SaveEvent(&evt); err != nil {
 							notice = err.Error()
 							return
+						}
+
+						if advancedSaver != nil {
+							advancedSaver.AfterSave(&evt)
 						}
 
 						notifyListeners(&evt)
@@ -159,12 +195,21 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 								return
 							}
 
-							events, err := relay.QueryEvents(&filters[i])
+							if advancedQuerier != nil {
+								advancedQuerier.BeforeQuery(&filters[i])
+							}
+
+							events, err := store.QueryEvents(&filters[i])
 							if err == nil {
 								for _, event := range events {
 									ws.WriteJSON([]interface{}{"EVENT", id, event})
 								}
 							}
+
+							if advancedQuerier != nil {
+								advancedQuerier.AfterQuery(&filters[i])
+							}
+
 							ws.WriteJSON([]interface{}{"EOSE", id})
 						}
 

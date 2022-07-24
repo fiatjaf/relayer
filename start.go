@@ -32,16 +32,22 @@ func Start(relay Relay) {
 	// expose this Log instance so implementations can use it
 	Log = log.With().Str("name", relay.Name()).Logger()
 
+	// allow implementations to do initialization stuff
+	if err := relay.Init(); err != nil {
+		Log.Fatal().Err(err).Msg("failed to start")
+	}
+
+	// initialize storage
+	if err := relay.Storage().Init(); err != nil {
+		log.Fatal().Err(err).Msg("error initializing storage")
+		return
+	}
+
 	// catch the websocket call before anything else
 	Router.Path("/").Headers("Upgrade", "websocket").HandlerFunc(handleWebsocket(relay))
 
 	// nip-11, relay information
 	Router.Path("/").Headers("Accept", "application/nostr+json").HandlerFunc(handleNIP11(relay))
-
-	// allow implementations to do initialization stuff
-	if err := relay.Init(); err != nil {
-		Log.Fatal().Err(err).Msg("failed to start")
-	}
 
 	// wait for events to come from implementations, if this is implemented
 	if inj, ok := relay.(Injector); ok {

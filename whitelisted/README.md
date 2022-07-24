@@ -3,7 +3,7 @@ whitelisted relay
 
   - a basic relay implementation based on relayer.
   - uses postgres, which I think must be over version 12 since it uses generated columns.
-  - only accepts events from specific pubkeys defined via the environment variable `AUTHORIZED_PUBKEYS` (comma-separated).
+  - only accepts events from specific pubkeys defined via the environment variable `WHITELIST` (comma-separated).
 
 running
 -------

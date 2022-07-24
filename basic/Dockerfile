@@ -1,8 +1,8 @@
-FROM golang:1.15.5
+FROM golang:1.18
 
 WORKDIR /go/src/app
 COPY ./ .
 
 RUN go get -d -v ./...
 RUN go install -v ./...
-RUN cd basic && make 
+RUN cd basic && make

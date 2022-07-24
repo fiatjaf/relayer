@@ -1,43 +1,59 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/fiatjaf/go-nostr"
 	"github.com/fiatjaf/relayer"
-	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/fiatjaf/relayer/storage/postgresql"
 	"github.com/kelseyhightower/envconfig"
 )
 
-type ClosedRelay struct {
-	PostgresDatabase  string   `envconfig:"POSTGRESQL_DATABASE"`
-	AuthorizedPubkeys []string `envconfig:"AUTHORIZED_PUBKEYS"`
-
-	DB *sqlx.DB
+type Relay struct {
+	PostgresDatabase string   `envconfig:"POSTGRESQL_DATABASE"`
+	Whitelist        []string `envconfig:"WHITELIST"`
 }
 
-func (b *ClosedRelay) Name() string {
-	return "ClosedRelay"
+func (r *Relay) Name() string {
+	return "WhitelistedRelay"
 }
 
-func (b *ClosedRelay) Init() error {
-	err := envconfig.Process("", b)
+func (r *Relay) Storage() relayer.Storage {
+	return &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
+}
+
+func (r *Relay) Init() error {
+	err := envconfig.Process("", r)
 	if err != nil {
 		return fmt.Errorf("couldn't process envconfig: %w", err)
-	}
-
-	if db, err := initDB(b.PostgresDatabase); err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
-	} else {
-		db.Mapper = reflectx.NewMapperFunc("json", sqlx.NameMapper)
-		b.DB = db
 	}
 
 	return nil
 }
 
-func main() {
-	var b ClosedRelay
+func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
+	// disallow anything from non-authorized pubkeys
+	found := false
+	for _, pubkey := range r.Whitelist {
+		if pubkey == evt.PubKey {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
 
-	relayer.Start(&b)
+	// block events that are too large
+	jsonb, _ := json.Marshal(evt)
+	if len(jsonb) > 100000 {
+		return false
+	}
+
+	return true
+}
+
+func main() {
+	relayer.Start(&Relay{})
 }

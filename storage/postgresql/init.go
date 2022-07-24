@@ -1,20 +1,23 @@
-package main
+package postgresql
 
 import (
 	"github.com/fiatjaf/relayer"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
-func initDB(dburl string) (*sqlx.DB, error) {
-	db, err := sqlx.Connect("postgres", dburl)
+func (b *PostgresBackend) Init() error {
+	db, err := sqlx.Connect("postgres", b.DatabaseURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	_, err = db.Exec(`
+	db.Mapper = reflectx.NewMapperFunc("json", sqlx.NameMapper)
+	b.DB = db
+
+	_, err = b.DB.Exec(`
 CREATE FUNCTION tags_to_tagvalues(jsonb) RETURNS text[]
-    AS 'SELECT array_agg(t->>1) FROM (SELECT jsonb_array_elements($1) AS t)s;'
+    AS 'SELECT array_agg(t->>1) FROM (SELECT jsonb_array_elements($1) AS t)s WHERE length(array_agg(t->>0)) = 1;'
     LANGUAGE SQL
     IMMUTABLE
     RETURNS NULL ON NULL INPUT;
@@ -38,5 +41,5 @@ CREATE INDEX IF NOT EXISTS kindidx ON event (kind);
 CREATE INDEX IF NOT EXISTS arbitrarytagvalues ON event USING gin (tagvalues);
     `)
 	relayer.Log.Print(err)
-	return db, nil
+	return nil
 }
