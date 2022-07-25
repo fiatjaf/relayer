@@ -9,7 +9,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/grokify/html-strip-tags-go v0.0.1
-	github.com/jb55/lnsocket/go v0.0.0-20220315220004-e1e6b88a0bfc
+	github.com/jb55/lnsocket/go v0.0.0-20220725174341-b98b5cd37bb6
 	github.com/jmoiron/sqlx v1.3.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mmcdole/gofeed v1.1.3
@@ -79,5 +79,3 @@ require (
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
 	golang.org/x/text v0.3.7 // indirect
 )
-
-replace github.com/jb55/lnsocket/go => /home/fiatjaf/comp/lnsocket/go
