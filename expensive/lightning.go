@@ -74,5 +74,5 @@ func checkInvoicePaidOk(pubkey string) bool {
 	})
 	result, _ := cln.Rpc(r.CLNRune, "listinvoices", string(jparams))
 
-	return gjson.Get(result, "invoices.0.paid").String() == "paid"
+	return gjson.Get(result, "result.invoices.0.status").String() == "paid"
 }

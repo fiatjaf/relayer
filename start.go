@@ -29,9 +29,6 @@ func Start(relay Relay) {
 		log.Panic().Err(err).Msg("couldn't process envconfig")
 	}
 
-	// expose this Log instance so implementations can use it
-	Log = log.With().Str("name", relay.Name()).Logger()
-
 	// allow implementations to do initialization stuff
 	if err := relay.Init(); err != nil {
 		Log.Fatal().Err(err).Msg("failed to start")
@@ -42,6 +39,9 @@ func Start(relay Relay) {
 		log.Fatal().Err(err).Msg("error initializing storage")
 		return
 	}
+
+	// expose this Log instance so implementations can use it
+	Log = log.With().Str("name", relay.Name()).Logger()
 
 	// catch the websocket call before anything else
 	Router.Path("/").Headers("Upgrade", "websocket").HandlerFunc(handleWebsocket(relay))
@@ -57,6 +57,8 @@ func Start(relay Relay) {
 			}
 		}()
 	}
+
+	relay.OnInitialized()
 
 	// start http server
 	srv := &http.Server{

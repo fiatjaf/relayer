@@ -9,6 +9,7 @@ import (
 	"github.com/fiatjaf/relayer"
 	"github.com/fiatjaf/relayer/storage/postgresql"
 	"github.com/kelseyhightower/envconfig"
+	_ "github.com/lib/pq"
 )
 
 type Relay struct {
@@ -17,6 +18,8 @@ type Relay struct {
 	CLNHost          string `envconfig:"CLN_HOST"`
 	CLNRune          string `envconfig:"CLN_RUNE"`
 	TicketPriceSats  int64  `envconfig:"TICKET_PRICE_SATS"`
+
+	db *postgresql.PostgresBackend
 }
 
 var r = &Relay{}
@@ -26,7 +29,7 @@ func (r *Relay) Name() string {
 }
 
 func (r *Relay) Storage() relayer.Storage {
-	return &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
+	return r.db
 }
 
 func (r *Relay) Init() error {
@@ -34,6 +37,8 @@ func (r *Relay) Init() error {
 	if err != nil {
 		return fmt.Errorf("couldn't process envconfig: %w", err)
 	}
+
+	r.db = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
 
 	// every hour, delete all very old events
 	go func() {
@@ -45,11 +50,13 @@ func (r *Relay) Init() error {
 		}
 	}()
 
+	return nil
+}
+
+func (r *Relay) OnInitialized() {
 	// special handlers
 	relayer.Router.Path("/").HandlerFunc(handleWebpage)
 	relayer.Router.Path("/invoice").HandlerFunc(handleInvoice)
-
-	return nil
 }
 
 func (r *Relay) AcceptEvent(evt *nostr.Event) bool {

@@ -10,6 +10,7 @@ var Log = log
 type Relay interface {
 	Name() string
 	Init() error
+	OnInitialized()
 	AcceptEvent(*nostr.Event) bool
 	Storage() Storage
 }
