@@ -4,6 +4,7 @@ import (
 	"github.com/fiatjaf/relayer"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
+	_ "github.com/lib/pq"
 )
 
 func (b *PostgresBackend) Init() error {

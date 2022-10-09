@@ -23,6 +23,8 @@ func (r *Relay) Storage() relayer.Storage {
 	return &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
 }
 
+func (r *Relay) OnInitialized() {}
+
 func (r *Relay) Init() error {
 	err := envconfig.Process("", r)
 	if err != nil {

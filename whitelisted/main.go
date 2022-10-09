@@ -19,6 +19,8 @@ func (r *Relay) Name() string {
 	return "WhitelistedRelay"
 }
 
+func (r *Relay) OnInitialized() {}
+
 func (r *Relay) Storage() relayer.Storage {
 	return &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
 }
