@@ -29,6 +29,8 @@ func (relay *Relay) Name() string {
 	return "relayer-rss-bridge"
 }
 
+func (r *Relay) OnInitialized() {}
+
 func (relay *Relay) Init() error {
 	err := envconfig.Process("", relay)
 	if err != nil {
