@@ -17,8 +17,8 @@ func (b *PostgresBackend) Init() error {
 	b.DB = db
 
 	_, err = b.DB.Exec(`
-CREATE FUNCTION tags_to_tagvalues(jsonb) RETURNS text[]
-    AS 'SELECT array_agg(t->>1) FROM (SELECT jsonb_array_elements($1) AS t)s WHERE length(array_agg(t->>0)) = 1;'
+CREATE OR REPLACE FUNCTION tags_to_tagvalues(jsonb) RETURNS text[]
+    AS 'SELECT array_agg(t->>1) FROM (SELECT jsonb_array_elements($1) AS t)s WHERE length(t->>0) = 1;'
     LANGUAGE SQL
     IMMUTABLE
     RETURNS NULL ON NULL INPUT;
