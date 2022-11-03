@@ -162,17 +162,21 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							return
 						}
 
-						if advancedSaver != nil {
-							advancedSaver.BeforeSave(&evt)
-						}
+						if 20000 <= evt.Kind && evt.Kind < 30000 {
+							// do not store ephemeral events
+						} else {
+							if advancedSaver != nil {
+								advancedSaver.BeforeSave(&evt)
+							}
 
-						if err := store.SaveEvent(&evt); err != nil {
-							notice = err.Error()
-							return
-						}
+							if err := store.SaveEvent(&evt); err != nil {
+								notice = err.Error()
+								return
+							}
 
-						if advancedSaver != nil {
-							advancedSaver.AfterSave(&evt)
+							if advancedSaver != nil {
+								advancedSaver.AfterSave(&evt)
+							}
 						}
 
 						notifyListeners(&evt)

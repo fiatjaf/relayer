@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/fiatjaf/go-nostr"
 )
@@ -34,12 +33,6 @@ func (b *PostgresBackend) SaveEvent(evt *nostr.Event) error {
 
 		return fmt.Errorf("failed to save event %s: %w", evt.ID, err)
 	}
-
-	// delete ephemeral events after a minute
-	go func() {
-		time.Sleep(75 * time.Second)
-		b.DB.Exec("DELETE FROM event WHERE id = $1", evt.ID)
-	}()
 
 	return nil
 }
