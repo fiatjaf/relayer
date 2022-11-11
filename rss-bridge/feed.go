@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/fiatjaf/go-nostr"
+	"github.com/nbd-wtf/go-nostr"
 	strip "github.com/grokify/html-strip-tags-go"
 	"github.com/mmcdole/gofeed"
 	"github.com/rif/cache2go"

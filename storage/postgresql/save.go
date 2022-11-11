@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fiatjaf/go-nostr"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 func (b *PostgresBackend) SaveEvent(evt *nostr.Event) error {

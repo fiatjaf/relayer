@@ -2,14 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
-	"github.com/fiatjaf/go-nostr"
 	"github.com/fiatjaf/relayer"
 	"github.com/fiatjaf/relayer/storage/postgresql"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 type Relay struct {
@@ -19,7 +18,7 @@ type Relay struct {
 	CLNRune          string `envconfig:"CLN_RUNE"`
 	TicketPriceSats  int64  `envconfig:"TICKET_PRICE_SATS"`
 
-	db *postgresql.PostgresBackend
+	storage *postgresql.PostgresBackend
 }
 
 var r = &Relay{}
@@ -29,17 +28,10 @@ func (r *Relay) Name() string {
 }
 
 func (r *Relay) Storage() relayer.Storage {
-	return r.db
+	return r.storage
 }
 
 func (r *Relay) Init() error {
-	err := envconfig.Process("", r)
-	if err != nil {
-		return fmt.Errorf("couldn't process envconfig: %w", err)
-	}
-
-	r.db = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
-
 	// every hour, delete all very old events
 	go func() {
 		db := r.Storage().(*postgresql.PostgresBackend)
@@ -87,5 +79,11 @@ func (r *Relay) AfterSave(evt *nostr.Event) {
 }
 
 func main() {
-	relayer.Start(r)
+	r := Relay{}
+	if err := envconfig.Process("", &r); err != nil {
+		relayer.Log.Fatal().Err(err).Msg("failed to read from env")
+		return
+	}
+	r.storage = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
+	relayer.Start(&r)
 }

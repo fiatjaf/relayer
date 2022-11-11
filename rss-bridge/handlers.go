@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/fiatjaf/go-nostr"
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/fiatjaf/relayer"
 	. "github.com/stevelacy/daz"
 )

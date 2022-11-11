@@ -41,6 +41,8 @@ CREATE INDEX IF NOT EXISTS timeidx ON event (created_at);
 CREATE INDEX IF NOT EXISTS kindidx ON event (kind);
 CREATE INDEX IF NOT EXISTS arbitrarytagvalues ON event USING gin (tagvalues);
     `)
-	relayer.Log.Print(err)
+	if err != nil {
+		relayer.Log.Print(err)
+	}
 	return nil
 }

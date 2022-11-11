@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fiatjaf/go-nostr"
 	"github.com/fiatjaf/relayer"
 	"github.com/fiatjaf/relayer/storage/postgresql"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 type Relay struct {
 	PostgresDatabase string `envconfig:"POSTGRESQL_DATABASE"`
+
+	storage *postgresql.PostgresBackend
 }
 
 func (r *Relay) Name() string {
@@ -20,7 +22,7 @@ func (r *Relay) Name() string {
 }
 
 func (r *Relay) Storage() relayer.Storage {
-	return &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
+	return r.storage
 }
 
 func (r *Relay) OnInitialized() {}
@@ -67,5 +69,11 @@ func (r *Relay) AfterSave(evt *nostr.Event) {
 }
 
 func main() {
-	relayer.Start(&Relay{})
+	r := Relay{}
+	if err := envconfig.Process("", &r); err != nil {
+		relayer.Log.Fatal().Err(err).Msg("failed to read from env")
+		return
+	}
+	r.storage = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
+	relayer.Start(&r)
 }

@@ -2,17 +2,18 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 
-	"github.com/fiatjaf/go-nostr"
 	"github.com/fiatjaf/relayer"
 	"github.com/fiatjaf/relayer/storage/postgresql"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 type Relay struct {
 	PostgresDatabase string   `envconfig:"POSTGRESQL_DATABASE"`
 	Whitelist        []string `envconfig:"WHITELIST"`
+
+	storage *postgresql.PostgresBackend
 }
 
 func (r *Relay) Name() string {
@@ -26,11 +27,6 @@ func (r *Relay) Storage() relayer.Storage {
 }
 
 func (r *Relay) Init() error {
-	err := envconfig.Process("", r)
-	if err != nil {
-		return fmt.Errorf("couldn't process envconfig: %w", err)
-	}
-
 	return nil
 }
 
@@ -57,5 +53,11 @@ func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
 }
 
 func main() {
-	relayer.Start(&Relay{})
+	r := Relay{}
+	if err := envconfig.Process("", &r); err != nil {
+		relayer.Log.Fatal().Err(err).Msg("failed to read from env")
+		return
+	}
+	r.storage = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
+	relayer.Start(&r)
 }
