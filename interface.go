@@ -1,12 +1,15 @@
 package relayer
 
 import (
-	"github.com/fiatjaf/go-nostr"
-	"github.com/fiatjaf/go-nostr/nip11"
+	"encoding/json"
+
+	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip11"
 )
 
 var Log = log
 
+// relay
 type Relay interface {
 	Name() string
 	Init() error
@@ -23,6 +26,19 @@ type Informationer interface {
 	GetNIP11InformationDocument() nip11.RelayInformationDocument
 }
 
+type CustomWebSocketHandler interface {
+	HandleUnknownType(ws *WebSocket, typ string, request []json.RawMessage)
+}
+
+// storage
+type Storage interface {
+	Init() error
+
+	QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error)
+	DeleteEvent(id string, pubkey string) error
+	SaveEvent(event *nostr.Event) error
+}
+
 type AdvancedQuerier interface {
 	BeforeQuery(*nostr.Filter)
 	AfterQuery([]nostr.Event, *nostr.Filter)
@@ -36,12 +52,4 @@ type AdvancedDeleter interface {
 type AdvancedSaver interface {
 	BeforeSave(*nostr.Event)
 	AfterSave(*nostr.Event)
-}
-
-type Storage interface {
-	Init() error
-
-	QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error)
-	DeleteEvent(id string, pubkey string) error
-	SaveEvent(event *nostr.Event) error
 }

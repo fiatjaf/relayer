@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fiatjaf/go-nostr"
-	"github.com/fiatjaf/go-nostr/nip11"
 	"github.com/gorilla/websocket"
+	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip11"
 )
 
 const (
@@ -36,9 +36,8 @@ var upgrader = websocket.Upgrader{
 func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		store := relay.Storage()
-		advancedQuerier, _ := store.(AdvancedQuerier)
 		advancedDeleter, _ := store.(AdvancedDeleter)
-		advancedSaver, _ := store.(AdvancedSaver)
+		advancedQuerier, _ := store.(AdvancedQuerier)
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -116,24 +115,12 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 						hash := sha256.Sum256(serialized)
 						evt.ID = hex.EncodeToString(hash[:])
 
-						// block too many indexable tags
-						t := 0
-						for _, tag := range evt.Tags {
-							if len(tag[0]) == 1 {
-								t++
-							}
-						}
-						if t > 3 {
-							notice = "too many indexable tags"
-							return
-						}
-
 						// check signature (requires the ID to be set)
 						if ok, err := evt.CheckSignature(); err != nil {
-							notice = "signature verification error"
+							ws.WriteJSON([]interface{}{"OK", evt.ID, false, "error: failed to verify signature"})
 							return
 						} else if !ok {
-							notice = "signature invalid"
+							ws.WriteJSON([]interface{}{"OK", evt.ID, false, "invalid: signature is invalid"})
 							return
 						}
 
@@ -146,7 +133,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 									}
 
 									if err := store.DeleteEvent(tag[1], evt.PubKey); err != nil {
-										notice = fmt.Sprintf("failed to delete: %s", err.Error())
+										ws.WriteJSON([]interface{}{"OK", evt.ID, false, fmt.Sprintf("error: %s", err.Error())})
 										return
 									}
 
@@ -158,28 +145,9 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 							return
 						}
 
-						if !relay.AcceptEvent(&evt) {
-							return
-						}
+						ok, message := AddEvent(relay, evt)
+						ws.WriteJSON([]interface{}{"OK", evt.ID, ok, message})
 
-						if 20000 <= evt.Kind && evt.Kind < 30000 {
-							// do not store ephemeral events
-						} else {
-							if advancedSaver != nil {
-								advancedSaver.BeforeSave(&evt)
-							}
-
-							if err := store.SaveEvent(&evt); err != nil {
-								notice = err.Error()
-								return
-							}
-
-							if advancedSaver != nil {
-								advancedSaver.AfterSave(&evt)
-							}
-						}
-
-						notifyListeners(&evt)
 						break
 					case "REQ":
 						var id string
@@ -227,7 +195,7 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 						break
 					case "CLOSE":
 						var id string
-						json.Unmarshal(request[0], &id)
+						json.Unmarshal(request[1], &id)
 						if id == "" {
 							notice = "CLOSE has no <id>"
 							return
@@ -236,7 +204,11 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 						removeListener(ws, id)
 						break
 					default:
-						notice = "unknown message type " + typ
+						if cwh, ok := relay.(CustomWebSocketHandler); ok {
+							cwh.HandleUnknownType(ws, typ, request)
+						} else {
+							notice = "unknown message type " + typ
+						}
 						return
 					}
 				}(message)

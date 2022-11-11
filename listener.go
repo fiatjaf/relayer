@@ -3,7 +3,7 @@ package relayer
 import (
 	"sync"
 
-	"github.com/fiatjaf/go-nostr"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 type Listener struct {
