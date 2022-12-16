@@ -31,7 +31,7 @@ document.querySelector('form').addEventListener('submit', async ev => {
   let res = await (await fetch('/invoice?pubkey=' + ev.target.pubkey.value)).text()
   let { bolt11, error } = JSON.parse(res)
   if (bolt11) {
-    invoice.innerHTML = invoice
+    invoice.innerHTML = bolt11
     link.href = 'lightning:' + bolt11
     new QRious({
       element: qr,
