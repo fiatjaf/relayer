@@ -66,8 +66,12 @@ func handleWebsocket(relay Relay) func(http.ResponseWriter, *http.Request) {
 				typ, message, err := conn.ReadMessage()
 				if err != nil {
 					if websocket.IsUnexpectedCloseError(
-						err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-						log.Warn().Err(err).Msg("unexpected close error")
+						err,
+						websocket.CloseGoingAway,        // 1001
+						websocket.CloseNoStatusReceived, // 1005
+						websocket.CloseAbnormalClosure,  // 1006
+					) {
+						log.Warn().Err(err).Str("ip", r.Header.Get("x-forwarded-for")).Msg("unexpected close error")
 					}
 					break
 				}
