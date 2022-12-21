@@ -23,7 +23,7 @@ func (r *Relay) Name() string {
 func (r *Relay) OnInitialized() {}
 
 func (r *Relay) Storage() relayer.Storage {
-	return &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
+	return r.storage
 }
 
 func (r *Relay) Init() error {
