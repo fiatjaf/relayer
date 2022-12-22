@@ -11,24 +11,30 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Settings specify initial startup parameters for a relay server.
+// See StartConf for details.
 type Settings struct {
 	Host string `envconfig:"HOST" default:"0.0.0.0"`
 	Port string `envconfig:"PORT" default:"7447"`
 }
 
-var (
-	s   Settings
-	log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
-)
+var log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 var Router = mux.NewRouter()
 
+// Start calls StartConf with Settings parsed from the process environment.
 func Start(relay Relay) {
-	// read host/port (implementations can read other stuff on their own if they need)
+	var s Settings
 	if err := envconfig.Process("", &s); err != nil {
 		log.Panic().Err(err).Msg("couldn't process envconfig")
 	}
+	StartConf(s, relay)
+}
 
+// StartConf initalizes the relay and its storage using their respective Init methods,
+// and starts listening for HTTP requests on host:port, as specified in the settings.
+// It never returns until process termination.
+func StartConf(s Settings, relay Relay) {
 	// allow implementations to do initialization stuff
 	if err := relay.Init(); err != nil {
 		Log.Fatal().Err(err).Msg("failed to start")
