@@ -85,5 +85,7 @@ func main() {
 		return
 	}
 	r.storage = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
-	relayer.Start(&r)
+	if err := relayer.Start(&r); err != nil {
+		relayer.Log.Fatal().Err(err).Msg("server terminated")
+	}
 }
