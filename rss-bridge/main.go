@@ -181,5 +181,7 @@ func (relay *Relay) InjectEvents() chan nostr.Event {
 }
 
 func main() {
-	relayer.Start(relay)
+	if err := relayer.Start(relay); err != nil {
+		relayer.Log.Fatal().Err(err).Msg("server terminated")
+	}
 }

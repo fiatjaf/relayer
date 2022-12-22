@@ -1,6 +1,7 @@
 package relayer
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -23,27 +24,29 @@ var log = zerolog.New(os.Stderr).Output(zerolog.ConsoleWriter{Out: os.Stderr})
 var Router = mux.NewRouter()
 
 // Start calls StartConf with Settings parsed from the process environment.
-func Start(relay Relay) {
+func Start(relay Relay) error {
 	var s Settings
 	if err := envconfig.Process("", &s); err != nil {
-		log.Panic().Err(err).Msg("couldn't process envconfig")
+		return fmt.Errorf("envconfig: %w", err)
 	}
-	StartConf(s, relay)
+	return StartConf(s, relay)
 }
 
 // StartConf initalizes the relay and its storage using their respective Init methods,
-// and starts listening for HTTP requests on host:port, as specified in the settings.
-// It never returns until process termination.
-func StartConf(s Settings, relay Relay) {
+// returning any non-nil errors, and starts listening for HTTP requests on host:port otherwise,
+// as specified in the settings.
+//
+// StartConf never returns until termination of the underlying http.Server, forwarding
+// any but http.ErrServerClosed error from the server's ListenAndServe.
+func StartConf(s Settings, relay Relay) error {
 	// allow implementations to do initialization stuff
 	if err := relay.Init(); err != nil {
-		Log.Fatal().Err(err).Msg("failed to start")
+		return fmt.Errorf("relay init: %w", err)
 	}
 
 	// initialize storage
 	if err := relay.Storage().Init(); err != nil {
-		log.Fatal().Err(err).Msg("error initializing storage")
-		return
+		return fmt.Errorf("storage init: %w", err)
 	}
 
 	// expose this Log instance so implementations can use it
@@ -76,5 +79,9 @@ func StartConf(s Settings, relay Relay) {
 		ReadHeaderTimeout: 2 * time.Second,
 	}
 	log.Debug().Str("addr", srv.Addr).Msg("listening")
-	srv.ListenAndServe()
+	srvErr := srv.ListenAndServe()
+	if srvErr == http.ErrServerClosed {
+		srvErr = nil
+	}
+	return srvErr
 }
