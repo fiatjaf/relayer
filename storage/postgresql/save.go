@@ -2,9 +2,8 @@ package postgresql
 
 import (
 	"encoding/json"
-	"fmt"
-	"strings"
 
+	"github.com/fiatjaf/relayer/storage"
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -21,17 +20,22 @@ func (b *PostgresBackend) SaveEvent(evt *nostr.Event) error {
 
 	// insert
 	tagsj, _ := json.Marshal(evt.Tags)
-	_, err := b.DB.Exec(`
+	res, err := b.DB.Exec(`
         INSERT INTO event (id, pubkey, created_at, kind, tags, content, sig)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (id) DO NOTHING
     `, evt.ID, evt.PubKey, evt.CreatedAt.Unix(), evt.Kind, tagsj, evt.Content, evt.Sig)
 	if err != nil {
-		if strings.Index(err.Error(), "UNIQUE") != -1 {
-			// already exists
-			return nil
-		}
+		return err
+	}
 
-		return fmt.Errorf("failed to save event %s: %w", evt.ID, err)
+	nr, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if nr == 0 {
+		return storage.ErrDupEvent
 	}
 
 	return nil
