@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/nbd-wtf/go-nostr"
 	"github.com/fiatjaf/relayer"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 var relay = &Relay{
@@ -101,9 +101,13 @@ type store struct {
 	db *pebble.DB
 }
 
-func (b store) Init() error                    { return nil }
-func (b store) SaveEvent(_ *nostr.Event) error { return errors.New("we don't accept any events") }
-func (b store) DeleteEvent(_, _ string) error  { return errors.New("we can't delete any events") }
+func (b store) Init() error { return nil }
+func (b store) SaveEvent(_ *nostr.Event) error {
+	return errors.New("blocked: we don't accept any events")
+}
+func (b store) DeleteEvent(_, _ string) error {
+	return errors.New("blocked: we can't delete any events")
+}
 
 func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
 	var evts []nostr.Event
