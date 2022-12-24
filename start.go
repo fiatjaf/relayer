@@ -1,6 +1,7 @@
 package relayer
 
 import (
+	"net"
 	"fmt"
 	"net/http"
 	"os"
@@ -72,7 +73,7 @@ func StartConf(s Settings, relay Relay) error {
 	// start http server
 	srv := &http.Server{
 		Handler:           cors.Default().Handler(Router),
-		Addr:              s.Host + ":" + s.Port,
+		Addr:              net.JoinHostPort(s.Host, s.Port),
 		WriteTimeout:      2 * time.Second,
 		ReadTimeout:       2 * time.Second,
 		IdleTimeout:       30 * time.Second,
