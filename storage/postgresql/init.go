@@ -1,7 +1,6 @@
 package postgresql
 
 import (
-	"github.com/fiatjaf/relayer"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/lib/pq"
@@ -41,8 +40,5 @@ CREATE INDEX IF NOT EXISTS timeidx ON event (created_at);
 CREATE INDEX IF NOT EXISTS kindidx ON event (kind);
 CREATE INDEX IF NOT EXISTS arbitrarytagvalues ON event USING gin (tagvalues);
     `)
-	if err != nil {
-		relayer.Log.Print(err)
-	}
-	return nil
+	return err
 }

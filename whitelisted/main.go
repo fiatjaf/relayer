@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 
 	"github.com/fiatjaf/relayer"
 	"github.com/fiatjaf/relayer/storage/postgresql"
@@ -20,7 +21,7 @@ func (r *Relay) Name() string {
 	return "WhitelistedRelay"
 }
 
-func (r *Relay) OnInitialized() {}
+func (r *Relay) OnInitialized(*relayer.Server) {}
 
 func (r *Relay) Storage() relayer.Storage {
 	return r.storage
@@ -55,11 +56,11 @@ func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
 func main() {
 	r := Relay{}
 	if err := envconfig.Process("", &r); err != nil {
-		relayer.Log.Fatal().Err(err).Msg("failed to read from env")
+		log.Fatalf("failed to read from env: %v", err)
 		return
 	}
 	r.storage = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
 	if err := relayer.Start(&r); err != nil {
-		relayer.Log.Fatal().Err(err).Msg("server terminated")
+		log.Fatalf("server terminated: %v", err)
 	}
 }
