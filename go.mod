@@ -16,7 +16,6 @@ require (
 	github.com/nbd-wtf/go-nostr v0.9.0
 	github.com/rif/cache2go v1.0.0
 	github.com/rs/cors v1.7.0
-	github.com/rs/zerolog v1.20.0
 	github.com/stevelacy/daz v0.1.4
 	github.com/tidwall/gjson v1.14.1
 )

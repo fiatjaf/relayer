@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/fiatjaf/relayer"
@@ -45,10 +46,10 @@ func (r *Relay) Init() error {
 	return nil
 }
 
-func (r *Relay) OnInitialized() {
+func (r *Relay) OnInitialized(s *relayer.Server) {
 	// special handlers
-	relayer.Router.Path("/").HandlerFunc(handleWebpage)
-	relayer.Router.Path("/invoice").HandlerFunc(handleInvoice)
+	s.Router().Path("/").HandlerFunc(handleWebpage)
+	s.Router().Path("/invoice").HandlerFunc(handleInvoice)
 }
 
 func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
@@ -81,11 +82,11 @@ func (r *Relay) AfterSave(evt *nostr.Event) {
 func main() {
 	r := Relay{}
 	if err := envconfig.Process("", &r); err != nil {
-		relayer.Log.Fatal().Err(err).Msg("failed to read from env")
+		log.Fatalf("failed to read from env: %v", err)
 		return
 	}
 	r.storage = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
 	if err := relayer.Start(&r); err != nil {
-		relayer.Log.Fatal().Err(err).Msg("server terminated")
+		log.Fatalf("server terminated: %v", err)
 	}
 }

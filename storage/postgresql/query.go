@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/fiatjaf/relayer"
 )
 
 func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error) {
@@ -137,11 +136,7 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 
 	rows, err := b.DB.Query(query, params...)
 	if err != nil && err != sql.ErrNoRows {
-		relayer.Log.Warn().Err(err).
-			Interface("filter", filter).
-			Str("query", query).
-			Msg("failed to fetch events")
-		return nil, fmt.Errorf("failed to fetch events: %w", err)
+		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
 	}
 
 	for rows.Next() {

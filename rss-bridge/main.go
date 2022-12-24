@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -29,7 +30,10 @@ func (relay *Relay) Name() string {
 	return "relayer-rss-bridge"
 }
 
-func (r *Relay) OnInitialized() {}
+func (r *Relay) OnInitialized(s *relayer.Server) {
+	s.Router().Path("/").HandlerFunc(handleWebpage)
+	s.Router().Path("/create").HandlerFunc(handleCreateFeed)
+}
 
 func (relay *Relay) Init() error {
 	err := envconfig.Process("", relay)
@@ -38,20 +42,16 @@ func (relay *Relay) Init() error {
 	}
 
 	if db, err := pebble.Open("db", nil); err != nil {
-		relayer.Log.Fatal().Err(err).Str("path", "db").Msg("failed to open db")
+		log.Fatalf("failed to open db: %v", err)
 	} else {
 		relay.db = db
 	}
-
-	relayer.Router.Path("/").HandlerFunc(handleWebpage)
-	relayer.Router.Path("/create").HandlerFunc(handleCreateFeed)
 
 	go func() {
 		time.Sleep(20 * time.Minute)
 
 		filters := relayer.GetListeningFilters()
-		relayer.Log.Info().Int("filters active", len(filters)).
-			Msg("checking for updates")
+		log.Printf("checking for updates; %d filters active", len(filters))
 
 		for _, filter := range filters {
 			if filter.Kinds == nil || filter.Kinds.Contains(nostr.KindTextNote) {
@@ -61,16 +61,13 @@ func (relay *Relay) Init() error {
 
 						var entity Entity
 						if err := json.Unmarshal(val, &entity); err != nil {
-							relayer.Log.Error().Err(err).Str("key", pubkey).
-								Str("val", string(val)).
-								Msg("got invalid json from db")
+							log.Printf("got invalid json from db at key %s: %v", pubkey, err)
 							continue
 						}
 
 						feed, err := parseFeed(entity.URL)
 						if err != nil {
-							relayer.Log.Warn().Err(err).Str("url", entity.URL).
-								Msg("failed to parse feed")
+							log.Printf("failed to parse feed at url %q: %v", entity.URL, err)
 							continue
 						}
 
@@ -121,15 +118,13 @@ func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
 
 			var entity Entity
 			if err := json.Unmarshal(val, &entity); err != nil {
-				relayer.Log.Error().Err(err).Str("key", pubkey).Str("val", string(val)).
-					Msg("got invalid json from db")
+				log.Printf("got invalid json from db at key %s: %v", pubkey, err)
 				continue
 			}
 
 			feed, err := parseFeed(entity.URL)
 			if err != nil {
-				relayer.Log.Warn().Err(err).Str("url", entity.URL).
-					Msg("failed to parse feed")
+				log.Printf("failed to parse feed at url %q: %v", entity.URL, err)
 				continue
 			}
 
@@ -182,6 +177,6 @@ func (relay *Relay) InjectEvents() chan nostr.Event {
 
 func main() {
 	if err := relayer.Start(relay); err != nil {
-		relayer.Log.Fatal().Err(err).Msg("server terminated")
+		log.Fatalf("server terminated: %v", err)
 	}
 }

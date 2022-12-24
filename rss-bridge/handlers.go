@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/fiatjaf/relayer"
 	. "github.com/stevelacy/daz"
 )
 
@@ -123,7 +123,7 @@ func handleCreateFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	relayer.Log.Info().Str("url", feedurl).Str("pubkey", pubkey).Msg("saved feed")
+	log.Printf("saved feed at url %q as pubkey %s", feedurl, pubkey)
 
 	fmt.Fprintf(w, "url   : %s\npubkey: %s", feedurl, pubkey)
 	return
