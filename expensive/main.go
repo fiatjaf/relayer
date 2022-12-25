@@ -55,8 +55,6 @@ func (r *Relay) OnInitialized(s *relayer.Server) {
 	})
 }
 
-
-
 func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
 	// only accept they have a good preimage for a paid invoice for their public key
 	if !checkInvoicePaidOk(evt.PubKey) {
