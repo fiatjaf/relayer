@@ -11,7 +11,7 @@ import (
 
 func generateLabel(pubkey string) string { return fmt.Sprintf("relayer-expensive:ticket:%s", pubkey) }
 
-func generateInvoice(pubkey string) (string, error) {
+func generateInvoice(r *Relay, pubkey string) (string, error) {
 	cln := lnsocket.LNSocket{}
 	cln.GenKey()
 

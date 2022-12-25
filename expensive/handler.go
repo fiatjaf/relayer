@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func handleWebpage(w http.ResponseWriter, r *http.Request) {
+func handleWebpage(w http.ResponseWriter, rq *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(`
 <meta charset=utf-8>
@@ -53,9 +53,9 @@ body {
     `))
 }
 
-func handleInvoice(w http.ResponseWriter, r *http.Request) {
+func handleInvoice(w http.ResponseWriter, rq *http.Request, r *Relay) {
 	w.Header().Set("Content-Type", "application/json")
-	invoice, err := generateInvoice(r.URL.Query().Get("pubkey"))
+	invoice, err := generateInvoice(r, rq.URL.Query().Get("pubkey"))
 	if err != nil {
 		json.NewEncoder(w).Encode(struct {
 			Error string `json:"error"`

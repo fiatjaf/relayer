@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"time"
+	"net/http"
 
 	"github.com/fiatjaf/relayer"
 	"github.com/fiatjaf/relayer/storage/postgresql"
@@ -49,8 +50,12 @@ func (r *Relay) Init() error {
 func (r *Relay) OnInitialized(s *relayer.Server) {
 	// special handlers
 	s.Router().Path("/").HandlerFunc(handleWebpage)
-	s.Router().Path("/invoice").HandlerFunc(handleInvoice)
+	s.Router().Path("/invoice").HandlerFunc(func(w http.ResponseWriter, rq *http.Request) {
+		handleInvoice(w, rq, r)
+	})
 }
+
+
 
 func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
 	// only accept they have a good preimage for a paid invoice for their public key
