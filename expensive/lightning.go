@@ -28,8 +28,8 @@ func generateInvoice(r *Relay, pubkey string) (string, error) {
 		"label": label,
 	})
 	result, _ := cln.Rpc(r.CLNRune, "listinvoices", string(jparams))
-	timestamp := time.Now().Unix()
 	if gjson.Get(result, "result.invoices.#").Int() == 1 {
+		timestamp := time.Now().Unix()
 		if (gjson.Get(result, "result.invoices.0.expires_at").Int() > timestamp) {
 			return gjson.Get(result, "result.invoices.0.bolt11").String(), nil
 		}
