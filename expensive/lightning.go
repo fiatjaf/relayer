@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	lnsocket "github.com/jb55/lnsocket/go"
 	"github.com/tidwall/gjson"
@@ -12,6 +13,7 @@ import (
 func generateLabel(pubkey string) string { return fmt.Sprintf("relayer-expensive:ticket:%s", pubkey) }
 
 func generateInvoice(r *Relay, pubkey string) (string, error) {
+	label := generateLabel(pubkey)
 	cln := lnsocket.LNSocket{}
 	cln.GenKey()
 
@@ -23,17 +25,25 @@ func generateInvoice(r *Relay, pubkey string) (string, error) {
 
 	// check if there is an invoice already
 	jparams, _ := json.Marshal(map[string]any{
-		"label": generateLabel(pubkey),
+		"label": label,
 	})
 	result, _ := cln.Rpc(r.CLNRune, "listinvoices", string(jparams))
-	if gjson.Get(result, "invoices.#").Int() == 1 {
-		return gjson.Get(result, "invoices.1.bolt11").String(), nil
+	timestamp := time.Now().Unix()
+	if gjson.Get(result, "result.invoices.#").Int() == 1 {
+		if (gjson.Get(result, "result.invoices.0.expires_at").Int() > timestamp) {
+			return gjson.Get(result, "result.invoices.0.bolt11").String(), nil
+		}
+		jparams, _ := json.Marshal(map[string]any{
+			"label": label,
+			"status": "expired",
+		})
+		cln.Rpc(r.CLNRune, "delinvoice", string(jparams))
 	}
 
 	// otherwise generate an invoice
 	jparams, _ = json.Marshal(map[string]any{
 		"amount_msat": r.TicketPriceSats * 1000,
-		"label":       generateLabel(pubkey),
+		"label":       label,
 		"description": fmt.Sprintf("%s's ticket for writing to relayer-expensive", pubkey),
 	})
 	result, err = cln.Rpc(r.CLNRune, "invoice", string(jparams))
