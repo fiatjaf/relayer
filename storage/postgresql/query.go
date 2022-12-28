@@ -32,7 +32,7 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 			// to prevent sql attack here we will check if
 			// these ids are valid 32byte hex
 			parsed, err := hex.DecodeString(id)
-			if err != nil || len(parsed) <= 32 {
+			if err != nil || len(parsed) != 32 {
 				continue
 			}
 			likeids = append(likeids, fmt.Sprintf("id LIKE '%x%%'", parsed))
