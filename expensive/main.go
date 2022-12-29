@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"time"
 	"net/http"
+	"time"
 
 	"github.com/fiatjaf/relayer"
 	"github.com/fiatjaf/relayer/storage/postgresql"
@@ -40,7 +40,7 @@ func (r *Relay) Init() error {
 
 		for {
 			time.Sleep(60 * time.Minute)
-			db.DB.Exec(`DELETE FROM event WHERE created_at < $1`, time.Now().AddDate(0, -6, 0)) // 6 months
+			db.DB.Exec(`DELETE FROM event WHERE created_at < $1`, time.Now().AddDate(0, -3, 0).Unix()) // 6 months
 		}
 	}()
 
