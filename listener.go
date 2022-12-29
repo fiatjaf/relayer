@@ -63,7 +63,8 @@ func setListener(id string, ws *WebSocket, filters nostr.Filters) {
 	}
 }
 
-func removeListener(ws *WebSocket, id string) {
+// Remove a specific subscription id from listeners for a given ws client
+func removeListenerId(ws *WebSocket, id string) {
 	listenersMutex.Lock()
 	defer func() {
 		listenersMutex.Unlock()
@@ -75,6 +76,17 @@ func removeListener(ws *WebSocket, id string) {
 		if len(subs) == 0 {
 			delete(listeners, ws)
 		}
+	}
+}
+
+// Remove WebSocket conn from listeners
+func removeListener(ws *WebSocket) {
+	listenersMutex.Lock()
+	defer listenersMutex.Unlock()
+
+	_, ok := listeners[ws]
+	if ok {
+		delete(listeners, ws)
 	}
 }
 
