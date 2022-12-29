@@ -40,7 +40,7 @@ func (r *Relay) Init() error {
 
 		for {
 			time.Sleep(60 * time.Minute)
-			db.DB.Exec(`DELETE FROM event WHERE created_at < $1`, time.Now().AddDate(0, -3, 0)) // 3 months
+			db.DB.Exec(`DELETE FROM event WHERE created_at < $1`, time.Now().AddDate(0, -3, 0).Unix()) // 3 months
 		}
 	}()
 
