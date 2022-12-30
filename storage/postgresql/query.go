@@ -139,6 +139,8 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
 	}
 
+	defer rows.Close()
+
 	for rows.Next() {
 		var evt nostr.Event
 		var timestamp int64
