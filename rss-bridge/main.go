@@ -12,6 +12,7 @@ import (
 	"github.com/fiatjaf/relayer"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nbd-wtf/go-nostr"
+	"golang.org/x/exp/slices"
 )
 
 var relay = &Relay{
@@ -54,7 +55,7 @@ func (relay *Relay) Init() error {
 		log.Printf("checking for updates; %d filters active", len(filters))
 
 		for _, filter := range filters {
-			if filter.Kinds == nil || filter.Kinds.Contains(nostr.KindTextNote) {
+			if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindTextNote) {
 				for _, pubkey := range filter.Authors {
 					if val, closer, err := relay.db.Get([]byte(pubkey)); err == nil {
 						defer closer.Close()
@@ -105,6 +106,7 @@ func (b store) Init() error { return nil }
 func (b store) SaveEvent(_ *nostr.Event) error {
 	return errors.New("blocked: we don't accept any events")
 }
+
 func (b store) DeleteEvent(_, _ string) error {
 	return errors.New("blocked: we can't delete any events")
 }
@@ -132,7 +134,7 @@ func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
 				continue
 			}
 
-			if filter.Kinds == nil || filter.Kinds.Contains(nostr.KindSetMetadata) {
+			if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindSetMetadata) {
 				evt := feedToSetMetadata(pubkey, feed)
 
 				if filter.Since != nil && evt.CreatedAt.Before(*filter.Since) {
@@ -146,7 +148,7 @@ func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
 				evts = append(evts, evt)
 			}
 
-			if filter.Kinds == nil || filter.Kinds.Contains(nostr.KindTextNote) {
+			if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindTextNote) {
 				var last uint32 = 0
 				for _, item := range feed.Items {
 					evt := itemToTextNote(pubkey, item)
