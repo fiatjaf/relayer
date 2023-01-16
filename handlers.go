@@ -53,7 +53,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	s.clients[conn] = struct{}{}
 	ticker := time.NewTicker(pingPeriod)
 
-	// nip-42 challenge
+	// NIP-42 challenge
 	challenge := make([]byte, 8)
 	rand.Read(challenge)
 
@@ -82,7 +82,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			return nil
 		})
 
-		// nip42 auth challenge
+		// NIP-42 auth challenge
 		if _, ok := s.relay.(Auther); ok {
 			ws.WriteJSON([]interface{}{"AUTH", ws.challenge})
 		}
@@ -260,6 +260,9 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 						if pubkey, ok := nip42.ValidateAuthEvent(&evt, ws.challenge, auther.ServiceURL()); ok {
 							ws.authed = pubkey
+							ws.WriteJSON([]interface{}{"OK", evt.ID, true, "authentication success"})
+						} else {
+							ws.WriteJSON([]interface{}{"OK", evt.ID, false, "error: failed to authenticate"})
 						}
 					}
 				default:
