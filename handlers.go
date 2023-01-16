@@ -1,6 +1,7 @@
 package relayer
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip11"
+	"github.com/nbd-wtf/go-nostr/nip42"
+	"golang.org/x/exp/slices"
 )
 
 // TODO: consdier moving these to Server as config params
@@ -50,7 +53,14 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	s.clients[conn] = struct{}{}
 	ticker := time.NewTicker(pingPeriod)
 
-	ws := &WebSocket{conn: conn}
+	// nip-42 challenge
+	challenge := make([]byte, 8)
+	rand.Read(challenge)
+
+	ws := &WebSocket{
+		conn:      conn,
+		challenge: hex.EncodeToString(challenge),
+	}
 
 	// reader
 	go func() {
@@ -71,6 +81,11 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			conn.SetReadDeadline(time.Now().Add(pongWait))
 			return nil
 		})
+
+		// nip42 auth challenge
+		if _, ok := s.relay.(Auther); ok {
+			ws.WriteJSON([]interface{}{"AUTH", ws.challenge})
+		}
 
 		for {
 			typ, message, err := conn.ReadMessage()
@@ -183,6 +198,25 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 						filter := &filters[i]
 
+						// prevent kind-4 events from being returned to unauthed users,
+						//   only when authentication is a thing
+						if _, ok := s.relay.(Auther); ok {
+							if slices.Contains(filter.Kinds, 4) {
+								// when fetching kind-4 one must be either on the sending or on the receiving end
+								senders := filter.Authors
+								receivers, _ := filter.Tags["e"]
+								if len(senders) > 1 || len(receivers) > 1 {
+									notice = "restricted: can't serve kind-4 messages to or from more than one key"
+									return
+								}
+								if (len(senders) == 1 && senders[0] != ws.authed) ||
+									(len(receivers) == 1 && receivers[0] != ws.authed) {
+									notice = "restricted: can't serve kind-4 to their participants"
+									return
+								}
+							}
+						}
+
 						if advancedQuerier != nil {
 							advancedQuerier.BeforeQuery(filter)
 						}
@@ -217,6 +251,17 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					removeListenerId(ws, id)
 					break
+				case "AUTH":
+					if auther, ok := s.relay.(Auther); ok {
+						var evt nostr.Event
+						if err := json.Unmarshal(request[1], &evt); err != nil {
+							notice = "failed to decode auth event: " + err.Error()
+							return
+						}
+						if pubkey, ok := nip42.ValidateAuthEvent(&evt, ws.challenge, auther.ServiceURL()); ok {
+							ws.authed = pubkey
+						}
+					}
 				default:
 					if cwh, ok := s.relay.(CustomWebSocketHandler); ok {
 						cwh.HandleUnknownType(ws, typ, request)
@@ -252,12 +297,17 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleNIP11(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	supportedNIPs := []int{9, 12, 15, 16, 20}
+	if _, ok := s.relay.(Auther); ok {
+		supportedNIPs = append(supportedNIPs, 42)
+	}
+
 	info := nip11.RelayInformationDocument{
 		Name:          s.relay.Name(),
 		Description:   "relay powered by the relayer framework",
 		PubKey:        "~",
 		Contact:       "~",
-		SupportedNIPs: []int{9, 15, 16},
+		SupportedNIPs: supportedNIPs,
 		Software:      "https://github.com/fiatjaf/relayer",
 		Version:       "~",
 	}

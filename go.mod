@@ -13,11 +13,12 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.3
 	github.com/mmcdole/gofeed v1.1.3
-	github.com/nbd-wtf/go-nostr v0.10.0
+	github.com/nbd-wtf/go-nostr v0.11.1
 	github.com/rif/cache2go v1.0.0
 	github.com/rs/cors v1.7.0
 	github.com/stevelacy/daz v0.1.4
 	github.com/tidwall/gjson v1.14.1
+	golang.org/x/exp v0.0.0-20221106115401-f9659909a136
 )
 
 require (
@@ -74,7 +75,6 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/valyala/fastjson v1.6.3 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
-	golang.org/x/exp v0.0.0-20221106115401-f9659909a136 // indirect
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect

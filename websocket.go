@@ -9,6 +9,10 @@ import (
 type WebSocket struct {
 	conn  *websocket.Conn
 	mutex sync.Mutex
+
+	// nip42
+	challenge string
+	authed    string
 }
 
 func (ws *WebSocket) WriteJSON(any interface{}) error {

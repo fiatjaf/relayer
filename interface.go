@@ -29,6 +29,10 @@ type Relay interface {
 	Storage() Storage
 }
 
+type Auther interface {
+	ServiceURL() string
+}
+
 type Injector interface {
 	InjectEvents() chan nostr.Event
 }
