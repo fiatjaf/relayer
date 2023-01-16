@@ -16,7 +16,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// TODO: consdier moving these to Server as config params
+// TODO: consider moving these to Server as config params
 const (
 	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
@@ -31,7 +31,7 @@ const (
 	maxMessageSize = 512000
 )
 
-// TODO: consdier moving these to Server as config params
+// TODO: consider moving these to Server as config params
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -211,7 +211,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 								}
 								if (len(senders) == 1 && senders[0] != ws.authed) ||
 									(len(receivers) == 1 && receivers[0] != ws.authed) {
-									notice = "restricted: can't serve kind-4 to their participants"
+									notice = "restricted: can only serve kind-4 to their participants"
 									return
 								}
 							}
