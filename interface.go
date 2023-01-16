@@ -29,6 +29,8 @@ type Relay interface {
 	Storage() Storage
 }
 
+// Auther is the interface for implementing NIP-42.
+// ServiceURL() returns the URL used to verify the "AUTH" event from clients.
 type Auther interface {
 	ServiceURL() string
 }
