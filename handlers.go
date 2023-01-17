@@ -177,7 +177,6 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 					ok, message := AddEvent(s.relay, evt)
 					ws.WriteJSON([]interface{}{"OK", evt.ID, ok, message})
 
-					break
 				case "REQ":
 					var id string
 					json.Unmarshal(request[1], &id)
@@ -202,16 +201,22 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						//   only when authentication is a thing
 						if _, ok := s.relay.(Auther); ok {
 							if slices.Contains(filter.Kinds, 4) {
-								// when fetching kind-4 one must be either on the sending or on the receiving end
 								senders := filter.Authors
-								receivers, _ := filter.Tags["e"]
-								if len(senders) > 1 || len(receivers) > 1 {
-									notice = "restricted: can't serve kind-4 messages to or from more than one key"
+								receivers, _ := filter.Tags["p"]
+								switch {
+								case ws.authed == "":
+									// not authenticated
+									notice = "restricted: this relay does not serve kind-4 to unauthenticated users, does your client implement NIP-42?"
 									return
-								}
-								if (len(senders) == 1 && senders[0] != ws.authed) ||
-									(len(receivers) == 1 && receivers[0] != ws.authed) {
-									notice = "restricted: can only serve kind-4 to their participants"
+								case len(senders) == 1 && len(receivers) < 2 && (senders[0] == ws.authed):
+									// allowed filter: ws.authed is sole sender (filter specifies one or all receivers)
+								case len(receivers) == 1 && len(senders) < 2 && (receivers[0] == ws.authed):
+									// allowed filter: ws.authed is sole receiver (filter specifies one or all senders)
+								default:
+									// restricted filter: do not return any events,
+									//   even if other elements in filters array were not restricted).
+									//   client should know better.
+									notice = "restricted: authenticated user does not have authorization for requested filters."
 									return
 								}
 							}
@@ -221,6 +226,8 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 							advancedQuerier.BeforeQuery(filter)
 						}
 
+						// TODO: Program calls SQL once for each filter in filters array.
+						// Maybe can replace with a single SQL query?
 						events, err := store.QueryEvents(filter)
 						if err != nil {
 							s.Log.Errorf("store: %v", err)
@@ -236,11 +243,11 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						for _, event := range events {
 							ws.WriteJSON([]interface{}{"EVENT", id, event})
 						}
-						ws.WriteJSON([]interface{}{"EOSE", id})
 					}
-
+					// moved EOSE out of for loop.
+					// otherwise subscriptions may be cancelled too early
+					ws.WriteJSON([]interface{}{"EOSE", id})
 					setListener(id, ws, filters)
-					break
 				case "CLOSE":
 					var id string
 					json.Unmarshal(request[1], &id)
@@ -250,7 +257,6 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 					}
 
 					removeListenerId(ws, id)
-					break
 				case "AUTH":
 					if auther, ok := s.relay.(Auther); ok {
 						var evt nostr.Event
@@ -271,7 +277,6 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 					} else {
 						notice = "unknown message type " + typ
 					}
-					return
 				}
 			}(message)
 		}
