@@ -132,7 +132,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				case "EVENT":
 					// it's a new event
 					var evt nostr.Event
-					if err := json.Unmarshal(request[1], &evt); err != nil {
+					if err := (&evt).UnmarshalJSON(request[1]); err != nil {
 						notice = "failed to decode event: " + err.Error()
 						return
 					}
@@ -241,7 +241,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 							events = events[0:filter.Limit]
 						}
 						for _, event := range events {
-							ws.WriteJSON([]interface{}{"EVENT", id, event})
+							message := []byte(fmt.Sprintf("[\"EVENT\",\"%s\",", id))
+							if m, e := event.MarshalJSON(); e == nil {
+								message = append(message, m...)
+								message = append(message, ']')
+								ws.WriteMessage(websocket.TextMessage, message)
+							}
 						}
 					}
 					// moved EOSE out of for loop.
@@ -260,7 +265,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				case "AUTH":
 					if auther, ok := s.relay.(Auther); ok {
 						var evt nostr.Event
-						if err := json.Unmarshal(request[1], &evt); err != nil {
+						if err := (&evt).UnmarshalJSON(request[1]); err != nil {
 							notice = "failed to decode auth event: " + err.Error()
 							return
 						}
