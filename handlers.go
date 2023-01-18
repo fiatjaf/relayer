@@ -40,8 +40,10 @@ var upgrader = websocket.Upgrader{
 
 func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	store := s.relay.Storage()
-	advancedDeleter, _ := store.(AdvancedDeleter)
-	advancedQuerier, _ := store.(AdvancedQuerier)
+	advancedDeleter, isAdvancedDeleter := store.(AdvancedDeleter)
+	advancedQuerier, isAdvancedQuerier := store.(AdvancedQuerier)
+	auther, isAuther := s.relay.(Auther)
+	cwh, isCustomWebSocketHandler := s.relay.(CustomWebSocketHandler)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -53,13 +55,16 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	s.clients[conn] = struct{}{}
 	ticker := time.NewTicker(pingPeriod)
 
-	// NIP-42 challenge
-	challenge := make([]byte, 8)
-	rand.Read(challenge)
-
 	ws := &WebSocket{
-		conn:      conn,
-		challenge: hex.EncodeToString(challenge),
+		conn: conn,
+	}
+
+	// NIP-42 challenge
+	var challenge []byte
+	if isAuther {
+		challenge = make([]byte, 8)
+		rand.Read(challenge)
+		ws.challenge = hex.EncodeToString(challenge)
 	}
 
 	// reader
@@ -83,7 +88,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		})
 
 		// NIP-42 auth challenge
-		if _, ok := s.relay.(Auther); ok {
+		if isAuther {
 			ws.WriteJSON([]interface{}{"AUTH", ws.challenge})
 		}
 
@@ -157,7 +162,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						// event deletion -- nip09
 						for _, tag := range evt.Tags {
 							if len(tag) >= 2 && tag[0] == "e" {
-								if advancedDeleter != nil {
+								if isAdvancedDeleter {
 									advancedDeleter.BeforeDelete(tag[1], evt.PubKey)
 								}
 
@@ -166,7 +171,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 									return
 								}
 
-								if advancedDeleter != nil {
+								if isAdvancedDeleter {
 									advancedDeleter.AfterDelete(tag[1], evt.PubKey)
 								}
 							}
@@ -199,7 +204,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 						// prevent kind-4 events from being returned to unauthed users,
 						//   only when authentication is a thing
-						if _, ok := s.relay.(Auther); ok {
+						if isAuther {
 							if slices.Contains(filter.Kinds, 4) {
 								senders := filter.Authors
 								receivers, _ := filter.Tags["p"]
@@ -214,7 +219,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 									// allowed filter: ws.authed is sole receiver (filter specifies one or all senders)
 								default:
 									// restricted filter: do not return any events,
-									//   even if other elements in filters array were not restricted).
+									//   even if other elements in filters array were not restricted.
 									//   client should know better.
 									notice = "restricted: authenticated user does not have authorization for requested filters."
 									return
@@ -222,7 +227,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 							}
 						}
 
-						if advancedQuerier != nil {
+						if isAdvancedQuerier {
 							advancedQuerier.BeforeQuery(filter)
 						}
 
@@ -234,7 +239,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 							continue
 						}
 
-						if advancedQuerier != nil {
+						if isAdvancedQuerier {
 							advancedQuerier.AfterQuery(events, filter)
 						}
 						if filter.Limit > 0 && len(events) > filter.Limit {
@@ -263,7 +268,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					removeListenerId(ws, id)
 				case "AUTH":
-					if auther, ok := s.relay.(Auther); ok {
+					if isAuther {
 						var evt nostr.Event
 						if err := (&evt).UnmarshalJSON(request[1]); err != nil {
 							notice = "failed to decode auth event: " + err.Error()
@@ -277,7 +282,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				default:
-					if cwh, ok := s.relay.(CustomWebSocketHandler); ok {
+					if isCustomWebSocketHandler {
 						cwh.HandleUnknownType(ws, typ, request)
 					} else {
 						notice = "unknown message type " + typ
@@ -310,24 +315,24 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleNIP11(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	supportedNIPs := []int{9, 12, 15, 16, 20}
-	if _, ok := s.relay.(Auther); ok {
-		supportedNIPs = append(supportedNIPs, 42)
-	}
-
-	info := nip11.RelayInformationDocument{
-		Name:          s.relay.Name(),
-		Description:   "relay powered by the relayer framework",
-		PubKey:        "~",
-		Contact:       "~",
-		SupportedNIPs: supportedNIPs,
-		Software:      "https://github.com/fiatjaf/relayer",
-		Version:       "~",
-	}
-
+	var info nip11.RelayInformationDocument
 	if ifmer, ok := s.relay.(Informationer); ok {
 		info = ifmer.GetNIP11InformationDocument()
+	} else {
+		// generic info document
+		supportedNIPs := []int{9, 12, 15, 16, 20}
+		if _, ok := s.relay.(Auther); ok {
+			supportedNIPs = append(supportedNIPs, 42)
+		}
+		info = nip11.RelayInformationDocument{
+			Name:          s.relay.Name(),
+			Description:   "relay powered by the relayer framework",
+			PubKey:        "~",
+			Contact:       "~",
+			SupportedNIPs: supportedNIPs,
+			Software:      "https://github.com/fiatjaf/relayer",
+			Version:       "~",
+		}
 	}
-
 	json.NewEncoder(w).Encode(info)
 }
