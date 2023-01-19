@@ -128,11 +128,17 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 		conditions = append(conditions, "true")
 	}
 
+	if filter.Limit < 1 || filter.Limit > 100 {
+		params = append(params, 100)
+	} else {
+		params = append(params, filter.Limit)
+	}
+
 	query := b.DB.Rebind(`SELECT
       id, pubkey, created_at, kind, tags, content, sig
     FROM event WHERE ` +
 		strings.Join(conditions, " AND ") +
-		" ORDER BY created_at LIMIT 100")
+		" ORDER BY created_at DESC LIMIT ?")
 
 	rows, err := b.DB.Query(query, params...)
 	if err != nil && err != sql.ErrNoRows {

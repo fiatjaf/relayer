@@ -226,8 +226,6 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 							advancedQuerier.BeforeQuery(filter)
 						}
 
-						// TODO: Program calls SQL once for each filter in filters array.
-						// Maybe can replace with a single SQL query?
 						events, err := store.QueryEvents(filter)
 						if err != nil {
 							s.Log.Errorf("store: %v", err)
