@@ -235,9 +235,14 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						if advancedQuerier != nil {
 							advancedQuerier.AfterQuery(events, filter)
 						}
+
+						// this block should not trigger if the SQL query accounts for filter.Limit
+						// other implementations may be broken, and this ensures the client
+						// won't be bombarded.
 						if filter.Limit > 0 && len(events) > filter.Limit {
 							events = events[0:filter.Limit]
 						}
+
 						for _, event := range events {
 							ws.WriteJSON([]interface{}{"EVENT", id, event})
 						}
