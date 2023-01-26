@@ -82,7 +82,7 @@ func TestServerShutdownWebsocket(t *testing.T) {
 	// connect a client to it
 	ctx1, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	client, err := nostr.RelayConnectContext(ctx1, "ws://"+srv.Addr())
+	client, err := nostr.RelayConnect(ctx1, "ws://"+srv.Addr())
 	if err != nil {
 		t.Fatalf("nostr.RelayConnectContext: %v", err)
 	}
