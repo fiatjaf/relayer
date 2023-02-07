@@ -4,23 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"strings"
+	"time"
 
-	"github.com/elastic/go-elasticsearch/esapi"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esutil"
 	"github.com/nbd-wtf/go-nostr"
 )
-
-/*
-1. create index with mapping in Init
-2. implement delete
-3. build query in QueryEvents
-4. implement replaceable events
-*/
 
 var indexMapping = `
 {
@@ -43,6 +36,7 @@ var indexMapping = `
 
 type ElasticsearchStorage struct {
 	es        *elasticsearch.Client
+	bi        esutil.BulkIndexer
 	indexName string
 }
 
@@ -72,154 +66,60 @@ func (ess *ElasticsearchStorage) Init() error {
 		}
 	}
 
+	// bulk indexer
+	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
+		Index:         ess.indexName,   // The default index name
+		Client:        es,              // The Elasticsearch client
+		NumWorkers:    2,               // The number of worker goroutines
+		FlushInterval: 3 * time.Second, // The periodic flush interval
+	})
+	if err != nil {
+		log.Fatalf("Error creating the indexer: %s", err)
+	}
+
 	ess.es = es
+	ess.bi = bi
 
 	return nil
-}
-
-type EsSearchResult struct {
-	Took     int
-	TimedOut bool `json:"timed_out"`
-	Hits     struct {
-		Total struct {
-			Value    int
-			Relation string
-		}
-		Hits []struct {
-			Source nostr.Event `json:"_source"`
-		}
-	}
-}
-
-func buildDsl(filter *nostr.Filter) string {
-	b := &strings.Builder{}
-	b.WriteString(`{"query": {"bool": {"filter": {"bool": {"must": [`)
-
-	prefixFilter := func(fieldName string, values []string) {
-		b.WriteString(`{"bool": {"should": [`)
-		for idx, val := range values {
-			if idx > 0 {
-				b.WriteRune(',')
-			}
-			op := "term"
-			if len(val) < 64 {
-				op = "prefix"
-			}
-			b.WriteString(fmt.Sprintf(`{"%s": {"%s": %q}}`, op, fieldName, val))
-		}
-		b.WriteString(`]}},`)
-	}
-
-	// ids
-	prefixFilter("id", filter.IDs)
-
-	// authors
-	prefixFilter("pubkey", filter.Authors)
-
-	// kinds
-	if len(filter.Kinds) > 0 {
-		k, _ := json.Marshal(filter.Kinds)
-		b.WriteString(fmt.Sprintf(`{"terms": {"kind": %s}},`, k))
-	}
-
-	// tags
-	{
-		b.WriteString(`{"bool": {"should": [`)
-		commaIdx := 0
-		for char, terms := range filter.Tags {
-			if len(terms) == 0 {
-				continue
-			}
-			if commaIdx > 0 {
-				b.WriteRune(',')
-			}
-			commaIdx++
-			b.WriteString(`{"bool": {"must": [`)
-			for _, t := range terms {
-				b.WriteString(fmt.Sprintf(`{"term": {"tags": %q}},`, t))
-			}
-			// add the tag type at the end
-			b.WriteString(fmt.Sprintf(`{"term": {"tags": %q}}`, char))
-			b.WriteString(`]}}`)
-		}
-		b.WriteString(`]}},`)
-	}
-
-	// since
-	if filter.Since != nil {
-		b.WriteString(fmt.Sprintf(`{"range": {"created_at": {"gt": %d}}},`, filter.Since.Unix()))
-	}
-
-	// until
-	if filter.Until != nil {
-		b.WriteString(fmt.Sprintf(`{"range": {"created_at": {"lt": %d}}},`, filter.Until.Unix()))
-	}
-
-	// all blocks have a trailing comma...
-	// add a match_all "noop" at the end
-	// so json is valid
-	b.WriteString(`{"match_all": {}}`)
-	b.WriteString(`]}}}}}`)
-	return b.String()
-}
-
-func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
-	// Perform the search request...
-	// need to build up query body...
-	if filter == nil {
-		return nil, errors.New("filter cannot be null")
-	}
-
-	dsl := buildDsl(filter)
-	// pprint([]byte(dsl))
-
-	es := ess.es
-	res, err := es.Search(
-		es.Search.WithContext(context.Background()),
-		es.Search.WithIndex(ess.indexName),
-
-		es.Search.WithBody(strings.NewReader(dsl)),
-		es.Search.WithSize(filter.Limit),
-		es.Search.WithSort("created_at:desc"),
-
-		es.Search.WithTrackTotalHits(true),
-		es.Search.WithPretty(),
-	)
-	if err != nil {
-		log.Fatalf("Error getting response: %s", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		txt, _ := io.ReadAll(res.Body)
-		fmt.Println("oh no", string(txt))
-		return nil, fmt.Errorf("%s", txt)
-	}
-
-	var r EsSearchResult
-	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-		return nil, err
-	}
-
-	events := make([]nostr.Event, len(r.Hits.Hits))
-	for i, e := range r.Hits.Hits {
-		events[i] = e.Source
-	}
-
-	return events, nil
 }
 
 func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
 	// todo: is pubkey match required?
-	res, err := ess.es.Delete(ess.indexName, id)
+
+	done := make(chan error)
+	err := ess.bi.Add(
+		context.Background(),
+		esutil.BulkIndexerItem{
+			Action:     "delete",
+			DocumentID: id,
+			OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
+				close(done)
+			},
+			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
+				if err != nil {
+					done <- err
+				} else {
+					// ok if deleted item not found
+					if res.Status == 404 {
+						close(done)
+						return
+					}
+					txt, _ := json.Marshal(res)
+					err := fmt.Errorf("ERROR: %s", txt)
+					done <- err
+				}
+			},
+		},
+	)
 	if err != nil {
 		return err
 	}
-	if res.IsError() {
-		txt, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("%s", txt)
+
+	err = <-done
+	if err != nil {
+		log.Println("DEL", err)
 	}
-	return nil
+	return err
 }
 
 func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
@@ -228,23 +128,36 @@ func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
 		return err
 	}
 
-	req := esapi.IndexRequest{
-		Index:      ess.indexName,
-		DocumentID: event.ID,
-		Body:       bytes.NewReader(data),
-		// Refresh:    "true",
-	}
+	done := make(chan error)
 
-	_, err = req.Do(context.Background(), ess.es)
-	return err
-}
-
-func pprint(j []byte) {
-	var dst bytes.Buffer
-	err := json.Indent(&dst, j, "", "    ")
+	// adapted from:
+	// https://github.com/elastic/go-elasticsearch/blob/main/_examples/bulk/indexer.go#L196
+	err = ess.bi.Add(
+		context.Background(),
+		esutil.BulkIndexerItem{
+			Action:     "index",
+			DocumentID: event.ID,
+			Body:       bytes.NewReader(data),
+			OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
+				close(done)
+			},
+			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
+				if err != nil {
+					done <- err
+				} else {
+					err := fmt.Errorf("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
+					done <- err
+				}
+			},
+		},
+	)
 	if err != nil {
-		fmt.Println("invalid JSON", err, string(j))
-	} else {
-		fmt.Println(dst.String())
+		return err
 	}
+
+	err = <-done
+	if err != nil {
+		log.Println("SAVE", err)
+	}
+	return err
 }

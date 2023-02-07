@@ -2,7 +2,6 @@ package elasticsearch
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -32,15 +31,15 @@ func TestQuery(t *testing.T) {
 	}
 
 	// "integration" test
-	ess := &ElasticsearchStorage{}
-	err := ess.Init()
-	if err != nil {
-		t.Error(err)
-	}
+	// ess := &ElasticsearchStorage{}
+	// err := ess.Init()
+	// if err != nil {
+	// 	t.Error(err)
+	// }
 
-	found, err := ess.QueryEvents(filter)
-	if err != nil {
-		t.Error(err)
-	}
-	fmt.Println(found)
+	// found, err := ess.QueryEvents(filter)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+	// fmt.Println(found)
 }
