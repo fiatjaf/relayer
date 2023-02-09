@@ -70,18 +70,6 @@ func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
 	return true
 }
 
-func (r *Relay) BeforeSave(evt *nostr.Event) {
-	// do nothing
-}
-
-func (r *Relay) AfterSave(evt *nostr.Event) {
-	// delete all but the 1000 most recent ones for each key
-	r.Storage().(*postgresql.PostgresBackend).DB.Exec(`DELETE FROM event WHERE pubkey = $1 AND kind = $2 AND created_at < (
-      SELECT created_at FROM event WHERE pubkey = $1
-      ORDER BY created_at DESC OFFSET 1000 LIMIT 1
-    )`, evt.PubKey, evt.Kind)
-}
-
 func main() {
 	r := Relay{}
 	if err := envconfig.Process("", &r); err != nil {
