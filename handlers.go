@@ -308,7 +308,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleNIP11(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	supportedNIPs := []int{9, 12, 15, 16, 20}
+	supportedNIPs := []int{9, 11, 12, 15, 16, 20}
 	if _, ok := s.relay.(Auther); ok {
 		supportedNIPs = append(supportedNIPs, 42)
 	}
