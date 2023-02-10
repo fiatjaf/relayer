@@ -23,7 +23,7 @@ type EsSearchResult struct {
 			Relation string
 		}
 		Hits []struct {
-			Source nostr.Event `json:"_source"`
+			Source IndexedEvent `json:"_source"`
 		}
 	}
 }
@@ -42,7 +42,7 @@ func buildDsl(filter *nostr.Filter) string {
 			if len(val) < 64 {
 				op = "prefix"
 			}
-			b.WriteString(fmt.Sprintf(`{"%s": {"%s": %q}}`, op, fieldName, val))
+			b.WriteString(fmt.Sprintf(`{"%s": {"event.%s": %q}}`, op, fieldName, val))
 		}
 		b.WriteString(`]}},`)
 	}
@@ -56,7 +56,7 @@ func buildDsl(filter *nostr.Filter) string {
 	// kinds
 	if len(filter.Kinds) > 0 {
 		k, _ := json.Marshal(filter.Kinds)
-		b.WriteString(fmt.Sprintf(`{"terms": {"kind": %s}},`, k))
+		b.WriteString(fmt.Sprintf(`{"terms": {"event.kind": %s}},`, k))
 	}
 
 	// tags
@@ -73,10 +73,10 @@ func buildDsl(filter *nostr.Filter) string {
 			commaIdx++
 			b.WriteString(`{"bool": {"must": [`)
 			for _, t := range terms {
-				b.WriteString(fmt.Sprintf(`{"term": {"tags": %q}},`, t))
+				b.WriteString(fmt.Sprintf(`{"term": {"event.tags": %q}},`, t))
 			}
 			// add the tag type at the end
-			b.WriteString(fmt.Sprintf(`{"term": {"tags": %q}}`, char))
+			b.WriteString(fmt.Sprintf(`{"term": {"event.tags": %q}}`, char))
 			b.WriteString(`]}}`)
 		}
 		b.WriteString(`]}},`)
@@ -84,12 +84,17 @@ func buildDsl(filter *nostr.Filter) string {
 
 	// since
 	if filter.Since != nil {
-		b.WriteString(fmt.Sprintf(`{"range": {"created_at": {"gt": %d}}},`, filter.Since.Unix()))
+		b.WriteString(fmt.Sprintf(`{"range": {"event.created_at": {"gt": %d}}},`, filter.Since.Unix()))
 	}
 
 	// until
 	if filter.Until != nil {
-		b.WriteString(fmt.Sprintf(`{"range": {"created_at": {"lt": %d}}},`, filter.Until.Unix()))
+		b.WriteString(fmt.Sprintf(`{"range": {"event.created_at": {"lt": %d}}},`, filter.Until.Unix()))
+	}
+
+	// search
+	if filter.Search != "" {
+		b.WriteString(fmt.Sprintf(`{"match": {"content_search": {"query": %s}}},`, filter.Search))
 	}
 
 	// all blocks have a trailing comma...
@@ -111,7 +116,7 @@ func (ess *ElasticsearchStorage) getByID(filter *nostr.Filter) ([]nostr.Event, e
 	var mgetResponse struct {
 		Docs []struct {
 			Found  bool
-			Source nostr.Event `json:"_source"`
+			Source IndexedEvent `json:"_source"`
 		}
 	}
 	if err := json.NewDecoder(got.Body).Decode(&mgetResponse); err != nil {
@@ -121,7 +126,7 @@ func (ess *ElasticsearchStorage) getByID(filter *nostr.Filter) ([]nostr.Event, e
 	events := make([]nostr.Event, 0, len(mgetResponse.Docs))
 	for _, e := range mgetResponse.Docs {
 		if e.Found {
-			events = append(events, e.Source)
+			events = append(events, e.Source.Event)
 		}
 	}
 
@@ -155,7 +160,7 @@ func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Even
 
 		es.Search.WithBody(strings.NewReader(dsl)),
 		es.Search.WithSize(limit),
-		es.Search.WithSort("created_at:desc"),
+		es.Search.WithSort("event.created_at:desc"),
 
 		// es.Search.WithTrackTotalHits(true),
 		// es.Search.WithPretty(),
@@ -178,7 +183,7 @@ func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Even
 
 	events := make([]nostr.Event, len(r.Hits.Hits))
 	for i, e := range r.Hits.Hits {
-		events[i] = e.Source
+		events[i] = e.Source.Event
 	}
 
 	return events, nil

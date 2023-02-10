@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/cockroachdb/pebble v0.0.0-20220723153705-3fc374e4dc66
-	github.com/elastic/go-elasticsearch v0.0.0
 	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
@@ -83,3 +82,5 @@ require (
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
 	golang.org/x/text v0.3.7 // indirect
 )
+
+replace github.com/nbd-wtf/go-nostr => /Users/steve/opc/go-nostr

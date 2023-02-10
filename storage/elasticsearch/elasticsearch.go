@@ -15,6 +15,11 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
+type IndexedEvent struct {
+	Event         nostr.Event `json:"event"`
+	ContentSearch string      `json:"content_search"`
+}
+
 var indexMapping = `
 {
 	"settings": {
@@ -24,11 +29,17 @@ var indexMapping = `
 	"mappings": {
 		"dynamic": false,
 		"properties": {
-			"id": {"type": "keyword"},
-			"pubkey": {"type": "keyword"},
-			"kind": {"type": "integer"},
-			"tags": {"type": "keyword"},
-			"created_at": {"type": "date"}
+			"event": {
+				"dynamic": false,
+				"properties": {
+					"id": {"type": "keyword"},
+					"pubkey": {"type": "keyword"},
+					"kind": {"type": "integer"},
+					"tags": {"type": "keyword"},
+					"created_at": {"type": "date"}
+				}
+			},
+			"content_search": {"type": "text"}
 		}
 	}
 }
@@ -49,7 +60,7 @@ func (ess *ElasticsearchStorage) Init() error {
 	// log.Println(es.Info())
 
 	// todo: config
-	ess.indexName = "test"
+	ess.indexName = "test3"
 
 	// todo: don't delete index every time
 	// es.Indices.Delete([]string{ess.indexName})
@@ -123,7 +134,17 @@ func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
 }
 
 func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
-	data, err := json.Marshal(event)
+	ie := &IndexedEvent{
+		Event: *event,
+	}
+
+	// post processing: index for FTS
+	// this could also possibly do custom indexing for kind=0.
+	if event.Kind != 4 {
+		ie.ContentSearch = event.Content
+	}
+
+	data, err := json.Marshal(ie)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
@@ -36,10 +35,10 @@ func (r *Relay) Init() error {
 
 func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
 	// block events that are too large
-	jsonb, _ := json.Marshal(evt)
-	if len(jsonb) > 100000 {
-		return false
-	}
+	// jsonb, _ := json.Marshal(evt)
+	// if len(jsonb) > 100000 {
+	// 	return false
+	// }
 
 	return true
 }
