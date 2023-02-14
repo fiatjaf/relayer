@@ -1,20 +1,23 @@
 version: "3.8"
 services:
 
-  # relay:
-  #   build:
-  #     context: ../
-  #     dockerfile: ./basic/Dockerfile
-  #   environment:
-  #     PORT: 2700
-  #     POSTGRESQL_DATABASE: postgres://nostr:nostr@postgres:5432/nostr?sslmode=disable
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   ports:
-  #     - 2700:2700
-  #   command: "./basic/relayer-basic"
-  
+  relay:
+    image: golang
+    # build:
+    #   context: ../
+    #   dockerfile: ./basic/Dockerfile
+    environment:
+      PORT: 2700
+      ES_URL: http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - 2700:2700
+    volumes:
+      - ./nostres:/bin/relay
+    command: "/bin/relay"
+
   elasticsearch:
     container_name: elasticsearch
     image: docker.elastic.co/elasticsearch/elasticsearch:8.6.0
@@ -39,5 +42,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-

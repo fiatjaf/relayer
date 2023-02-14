@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -52,18 +53,17 @@ type ElasticsearchStorage struct {
 }
 
 func (ess *ElasticsearchStorage) Init() error {
-	es, err := elasticsearch.NewDefaultClient()
+	cfg := elasticsearch.Config{}
+	if x := os.Getenv("ES_URL"); x != "" {
+		cfg.Addresses = strings.Split(x, ",")
+	}
+	es, err := elasticsearch.NewClient(cfg)
 	if err != nil {
 		return err
 	}
-	// log.Println(elasticsearch.Version)
-	// log.Println(es.Info())
 
-	// todo: config
+	// todo: config + mapping settings
 	ess.indexName = "test3"
-
-	// todo: don't delete index every time
-	// es.Indices.Delete([]string{ess.indexName})
 
 	res, err := es.Indices.Create(ess.indexName, es.Indices.Create.WithBody(strings.NewReader(indexMapping)))
 	if err != nil {
@@ -139,7 +139,12 @@ func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
 	}
 
 	// post processing: index for FTS
-	// this could also possibly do custom indexing for kind=0.
+	// some ideas:
+	// - index kind=0 fields a set of dedicated mapped fields
+	//   (or use a separate index for profiles with a dedicated mapping)
+	// - if it's valid JSON just index the "values" and not the keys
+	// - more content introspection: language detection
+	// - denormalization... attach profile + ranking signals to events
 	if event.Kind != 4 {
 		ie.ContentSearch = event.Content
 	}

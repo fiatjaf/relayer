@@ -83,4 +83,4 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 )
 
-replace github.com/nbd-wtf/go-nostr => /Users/steve/opc/go-nostr
+replace github.com/nbd-wtf/go-nostr => ../go-nostr
