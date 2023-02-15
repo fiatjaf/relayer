@@ -26,7 +26,7 @@ jobs:
       matrix:
         goos: [linux, windows, darwin, freebsd, openbsd]
         goarch: [amd64, arm64]
-        project: ['basic', 'whitelisted', 'expensive', 'rss-bridge']
+        project: ['basic', 'whitelisted', 'expensive', 'rss-bridge', 'search']
         exclude:
           - goarch: arm64
             goos: windows
