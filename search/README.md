@@ -1,3 +1,9 @@
+# Search Relay
+
+Uses ElasticSearch storage backend for all queries, with some basic full text search support.
+
+Index some events:
+
 ```
 bzip2 -cd nostr-wellorder-early-1m-v1.jsonl.bz2 | \
   jq -c '["EVENT", .]' | \
@@ -5,16 +11,16 @@ bzip2 -cd nostr-wellorder-early-1m-v1.jsonl.bz2 | \
   websocat -n -B 200000 ws://127.0.0.1:7447
 ```
 
+Do a search:
+
 ```
 echo '["REQ", "asdf", {"search": "steve", "kinds": [0]}]' | websocat -n ws://127.0.0.1:7447
 ```
 
 
-todo:
+## Customize
 
-* index `content_search` field
-* support search queries
-* some kind of ranking signal (based on pubkey)
-* better config for ES: adjust bulk indexer settings, use custom mapping?
+Currently the indexing is very basic:  It will index the `contents` field for all events where kind != 4.
+Some additional mapping and pre-processing could add better support for different content types.
+See comments in `storage/elasticsearch/elasticsearch.go`.
 
-* ES DSL string builder might not escape json strings correctly...

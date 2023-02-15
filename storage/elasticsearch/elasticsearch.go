@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -47,12 +46,18 @@ var indexMapping = `
 `
 
 type ElasticsearchStorage struct {
-	es        *elasticsearch.Client
-	bi        esutil.BulkIndexer
-	indexName string
+	IndexName string
+
+	es *elasticsearch.Client
+	bi esutil.BulkIndexer
 }
 
 func (ess *ElasticsearchStorage) Init() error {
+
+	if ess.IndexName == "" {
+		ess.IndexName = "events"
+	}
+
 	cfg := elasticsearch.Config{}
 	if x := os.Getenv("ES_URL"); x != "" {
 		cfg.Addresses = strings.Split(x, ",")
@@ -62,10 +67,7 @@ func (ess *ElasticsearchStorage) Init() error {
 		return err
 	}
 
-	// todo: config + mapping settings
-	ess.indexName = "test3"
-
-	res, err := es.Indices.Create(ess.indexName, es.Indices.Create.WithBody(strings.NewReader(indexMapping)))
+	res, err := es.Indices.Create(ess.IndexName, es.Indices.Create.WithBody(strings.NewReader(indexMapping)))
 	if err != nil {
 		return err
 	}
@@ -79,13 +81,13 @@ func (ess *ElasticsearchStorage) Init() error {
 
 	// bulk indexer
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
-		Index:         ess.indexName,   // The default index name
-		Client:        es,              // The Elasticsearch client
-		NumWorkers:    2,               // The number of worker goroutines
-		FlushInterval: 3 * time.Second, // The periodic flush interval
+		Index:         ess.IndexName,
+		Client:        es,
+		NumWorkers:    2,
+		FlushInterval: 3 * time.Second,
 	})
 	if err != nil {
-		log.Fatalf("Error creating the indexer: %s", err)
+		return fmt.Errorf("error creating the indexer: %s", err)
 	}
 
 	ess.es = es
@@ -127,9 +129,6 @@ func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
 	}
 
 	err = <-done
-	if err != nil {
-		log.Println("DEL", err)
-	}
 	return err
 }
 
@@ -182,8 +181,5 @@ func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
 	}
 
 	err = <-done
-	if err != nil {
-		log.Println("SAVE", err)
-	}
 	return err
 }

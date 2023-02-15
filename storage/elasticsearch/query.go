@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"strings"
+	"reflect"
 
+	"github.com/aquasecurity/esquery"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -28,87 +29,67 @@ type EsSearchResult struct {
 	}
 }
 
-func buildDsl(filter *nostr.Filter) string {
-	b := &strings.Builder{}
-	b.WriteString(`{"query": {"bool": {"filter": {"bool": {"must": [`)
+func buildDsl(filter *nostr.Filter) ([]byte, error) {
+	dsl := esquery.Bool()
 
 	prefixFilter := func(fieldName string, values []string) {
-		b.WriteString(`{"bool": {"should": [`)
-		for idx, val := range values {
-			if idx > 0 {
-				b.WriteRune(',')
-			}
-			op := "term"
-			if len(val) < 64 {
-				op = "prefix"
-			}
-			b.WriteString(fmt.Sprintf(`{"%s": {"event.%s": %q}}`, op, fieldName, val))
+		if len(values) == 0 {
+			return
 		}
-		b.WriteString(`]}},`)
+		prefixQ := esquery.Bool()
+		for _, v := range values {
+			if len(v) < 64 {
+				prefixQ.Should(esquery.Prefix(fieldName, v))
+			} else {
+				prefixQ.Should(esquery.Term(fieldName, v))
+			}
+		}
+		dsl.Must(prefixQ)
 	}
 
 	// ids
-	prefixFilter("id", filter.IDs)
+	prefixFilter("event.id", filter.IDs)
 
 	// authors
-	prefixFilter("pubkey", filter.Authors)
+	prefixFilter("event.pubkey", filter.Authors)
 
 	// kinds
 	if len(filter.Kinds) > 0 {
-		k, _ := json.Marshal(filter.Kinds)
-		b.WriteString(fmt.Sprintf(`{"terms": {"event.kind": %s}},`, k))
+		dsl.Must(esquery.Terms("event.kind", toInterfaceSlice(filter.Kinds)...))
 	}
 
 	// tags
-	{
-		b.WriteString(`{"bool": {"should": [`)
-		commaIdx := 0
+	if len(filter.Tags) > 0 {
+		tagQ := esquery.Bool()
 		for char, terms := range filter.Tags {
-			if len(terms) == 0 {
-				continue
-			}
-			if commaIdx > 0 {
-				b.WriteRune(',')
-			}
-			commaIdx++
-			b.WriteString(`{"bool": {"must": [`)
-			for _, t := range terms {
-				b.WriteString(fmt.Sprintf(`{"term": {"event.tags": %q}},`, t))
-			}
-			// add the tag type at the end
-			b.WriteString(fmt.Sprintf(`{"term": {"event.tags": %q}}`, char))
-			b.WriteString(`]}}`)
+			vs := toInterfaceSlice(append(terms, char))
+			tagQ.Should(esquery.Terms("event.tags", vs...))
 		}
-		b.WriteString(`]}},`)
+		dsl.Must(tagQ)
 	}
 
 	// since
 	if filter.Since != nil {
-		b.WriteString(fmt.Sprintf(`{"range": {"event.created_at": {"gt": %d}}},`, filter.Since.Unix()))
+		dsl.Must(esquery.Range("event.created_at").Gt(filter.Since.Unix()))
 	}
 
 	// until
 	if filter.Until != nil {
-		b.WriteString(fmt.Sprintf(`{"range": {"event.created_at": {"lt": %d}}},`, filter.Until.Unix()))
+		dsl.Must(esquery.Range("event.created_at").Lt(filter.Until.Unix()))
 	}
 
 	// search
 	if filter.Search != "" {
-		b.WriteString(fmt.Sprintf(`{"match": {"content_search": {"query": %s}}},`, filter.Search))
+		dsl.Must(esquery.Match("content_search", filter.Search))
 	}
 
-	// all blocks have a trailing comma...
-	// add a match_all "noop" at the end
-	// so json is valid
-	b.WriteString(`{"match_all": {}}`)
-	b.WriteString(`]}}}}}`)
-	return b.String()
+	return json.Marshal(esquery.Query(dsl))
 }
 
 func (ess *ElasticsearchStorage) getByID(filter *nostr.Filter) ([]nostr.Event, error) {
 	got, err := ess.es.Mget(
 		esutil.NewJSONReader(filter),
-		ess.es.Mget.WithIndex(ess.indexName))
+		ess.es.Mget.WithIndex(ess.IndexName))
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +115,6 @@ func (ess *ElasticsearchStorage) getByID(filter *nostr.Filter) ([]nostr.Event, e
 }
 
 func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
-	// Perform the search request...
-	// need to build up query body...
 	if filter == nil {
 		return nil, errors.New("filter cannot be null")
 	}
@@ -145,8 +124,10 @@ func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Even
 		return ess.getByID(filter)
 	}
 
-	dsl := buildDsl(filter)
-	pprint([]byte(dsl))
+	dsl, err := buildDsl(filter)
+	if err != nil {
+		return nil, err
+	}
 
 	limit := 1000
 	if filter.Limit > 0 && filter.Limit < limit {
@@ -156,14 +137,11 @@ func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Even
 	es := ess.es
 	res, err := es.Search(
 		es.Search.WithContext(context.Background()),
-		es.Search.WithIndex(ess.indexName),
+		es.Search.WithIndex(ess.IndexName),
 
-		es.Search.WithBody(strings.NewReader(dsl)),
+		es.Search.WithBody(bytes.NewReader(dsl)),
 		es.Search.WithSize(limit),
 		es.Search.WithSort("event.created_at:desc"),
-
-		// es.Search.WithTrackTotalHits(true),
-		// es.Search.WithPretty(),
 	)
 	if err != nil {
 		log.Fatalf("Error getting response: %s", err)
@@ -207,12 +185,23 @@ func isGetByID(filter *nostr.Filter) bool {
 	return isGetById
 }
 
-func pprint(j []byte) {
-	var dst bytes.Buffer
-	err := json.Indent(&dst, j, "", "    ")
-	if err != nil {
-		fmt.Println("invalid JSON", err, string(j))
-	} else {
-		fmt.Println(dst.String())
+// from: https://stackoverflow.com/a/12754757
+func toInterfaceSlice(slice interface{}) []interface{} {
+	s := reflect.ValueOf(slice)
+	if s.Kind() != reflect.Slice {
+		panic("InterfaceSlice() given a non-slice type")
 	}
+
+	// Keep the distinction between nil and empty slice input
+	if s.IsNil() {
+		return nil
+	}
+
+	ret := make([]interface{}, s.Len())
+
+	for i := 0; i < s.Len(); i++ {
+		ret[i] = s.Index(i).Interface()
+	}
+
+	return ret
 }
