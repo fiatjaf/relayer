@@ -137,6 +137,11 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
+					if len(message) > s.settings.MaxEventSize {
+						ws.WriteJSON([]interface{}{"OK", evt.ID, false, "error: invalid event size"})
+						return
+					}
+
 					// check serialization
 					serialized := evt.Serialize()
 

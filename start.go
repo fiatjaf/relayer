@@ -18,8 +18,9 @@ import (
 
 // Settings specify initial startup parameters for Start and StartConf.
 type Settings struct {
-	Host string `envconfig:"HOST" default:"0.0.0.0"`
-	Port string `envconfig:"PORT" default:"7447"`
+	Host         string `envconfig:"HOST" default:"0.0.0.0"`
+	Port         string `envconfig:"PORT" default:"7447"`
+	MaxEventSize int    `envconfig:"MAX_EVENT_SIZE" default":"10000"`
 }
 
 // Start calls StartConf with Settings parsed from the process environment.
@@ -36,6 +37,7 @@ func Start(relay Relay) error {
 func StartConf(s Settings, relay Relay) error {
 	addr := net.JoinHostPort(s.Host, s.Port)
 	srv := NewServer(addr, relay)
+	srv.settings = &s
 	return srv.Start()
 }
 
@@ -66,6 +68,7 @@ type Server struct {
 	// keep a connection reference to all connected clients for Server.Shutdown
 	clientsMu sync.Mutex
 	clients   map[*websocket.Conn]struct{}
+	settings  *Settings
 }
 
 // NewServer creates a relay server with sensible defaults.
@@ -77,6 +80,11 @@ func NewServer(addr string, relay Relay) *Server {
 		relay:   relay,
 		router:  mux.NewRouter(),
 		clients: make(map[*websocket.Conn]struct{}),
+		settings: &Settings{
+			MaxEventSize: 10000, // in Bytes
+			Port:         "7447",
+			Host:         "0.0.0.0",
+		},
 	}
 	srv.router.Path("/").Headers("Upgrade", "websocket").HandlerFunc(srv.handleWebsocket)
 	srv.router.Path("/").Headers("Accept", "application/nostr+json").HandlerFunc(srv.handleNIP11)
