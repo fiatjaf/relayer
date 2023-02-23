@@ -1,0 +1,4 @@
+- hosts: all
+  become: yes
+  roles:
+    - ../ansible-role-nostr-relayer/

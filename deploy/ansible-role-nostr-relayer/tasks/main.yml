@@ -1,0 +1,14 @@
+---
+- name: Clone a github repository
+  git:
+    repo: https://github.com/fiatjaf/relayer.git
+    dest: /opt/relayer/
+    clone: yes
+
+- name: Run `docker-compose up`
+  docker_compose:
+    project_src: /opt/relayer/basic
+    build: no
+    state: present
+  register: output
+...

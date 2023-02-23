@@ -1,0 +1,3 @@
+- src: https://github.com/nir3shprabu/ansible-role-docker
+  name: ansible-role-docker
+  version: v1.1.0
