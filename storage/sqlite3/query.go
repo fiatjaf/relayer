@@ -122,6 +122,14 @@ func (b SQLite3Backend) QueryEvents(filter *nostr.Filter) (events []nostr.Event,
 		conditions = append(conditions, "created_at < ?")
 		params = append(params, filter.Until.Unix())
 	}
+	if filter.Search != "" {
+		conditions = append(conditions, "content LIKE ?")
+		s := filter.Search
+		if ss, err := strconv.Unquote(s); err == nil {
+			s = ss
+		}
+		params = append(params, "%"+s+"%")
+	}
 
 	if len(conditions) == 0 {
 		// fallback
