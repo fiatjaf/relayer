@@ -124,11 +124,7 @@ func (b SQLite3Backend) QueryEvents(filter *nostr.Filter) (events []nostr.Event,
 	}
 	if filter.Search != "" {
 		conditions = append(conditions, "content LIKE ?")
-		s := filter.Search
-		if ss, err := strconv.Unquote(s); err == nil {
-			s = ss
-		}
-		params = append(params, "%"+s+"%")
+		params = append(params, "%"+filter.Search+"%")
 	}
 
 	if len(conditions) == 0 {
