@@ -49,3 +49,34 @@ gcloud auth application-default login
 | `region` | string | yes |
 | `public_keypath` |  string | yes |
 | `private_keypath` | string | yes |
+
+# Usage
+`make` automates the process of manually running the terraform command chains
+
+## Configure terraform variables
+
+You may run below command to template out a `terraform.tfvars` file.
+
+```
+make gcp-setup
+```
+
+## Deploy relayer instance
+
+Once your variables are in place, the terraform plan is set and ready to be applied
+
+```
+make gcp
+```
+
+## Destroy relayer instance
+
+```
+make destroy-gcp
+```
+
+## Output
+
+| Name | Description |
+| ---- | ----------- |
+| nostr_relayer_ip | The public IP address of the relayer instance. |
