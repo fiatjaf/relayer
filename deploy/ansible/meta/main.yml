@@ -1,6 +1,4 @@
 dependencies:
-  - src: https://github.com/nir3shprabu/ansible-role-docker
-    scm: git
-    name: ansible-role-docker
-    version: v1.1.0
-    
+  - name: nir3shprabu.docker
+collections:
+  - devsec.hardening
