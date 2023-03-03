@@ -58,7 +58,7 @@ gcloud auth application-default login
 You may run below command to template out a `terraform.tfvars` file.
 
 ```
-make gcp-setup
+make setup-gcp
 ```
 
 ## Deploy relayer instance
@@ -66,7 +66,7 @@ make gcp-setup
 Once your variables are in place, the terraform plan is set and ready to be applied
 
 ```
-make gcp
+make create-gcp
 ```
 
 ## Destroy relayer instance
