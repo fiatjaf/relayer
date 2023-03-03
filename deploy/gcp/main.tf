@@ -70,9 +70,8 @@ resource "google_compute_instance" "nostr-relayer" {
     export ANSIBLE_HOST_KEY_CHECKING=False && \
     echo "${google_compute_address.static.address} ansible_user=ubuntu ansible_ssh_private_key_file=${var.private_keypath}" | tee -a hosts && \
     export ANSIBLE_HOST_KEY_CHECKING=False && \
-    ansible-galaxy install -r ../ansible/requirements.yml -p ../.
+    ansible-galaxy install -r ../ansible/requirements.yml
     ansible-playbook -u ubuntu --private-key ${var.private_keypath} -i hosts site.yml
-    rm -rf ../ansible-role-docker
   EOT
 
   }
