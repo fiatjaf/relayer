@@ -1,4 +1,2 @@
 dependencies:
   - name: nir3shprabu.docker
-collections:
-  - devsec.hardening

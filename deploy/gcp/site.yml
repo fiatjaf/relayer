@@ -1,8 +1,4 @@
 - hosts: all
   become: yes
-  collections:
-    - devsec.hardening
   roles:
-    - devsec.hardening.ssh_hardening
-    - devsec.hardening.os_hardening
     - ../ansible
