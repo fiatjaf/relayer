@@ -11,16 +11,21 @@ resource "google_project_iam_member" "nostr-relayer" {
 }
 
 resource "google_compute_firewall" "firewall" {
-  name    = "nostr-relayer"
+  name    = "nostr-relayer-firewall"
+  project = var.project_id
   network = "default"
 
   allow {
+    protocol = "icmp"
+  }
+
+  allow {
     protocol = "tcp"
-    ports    = ["22", "80", "2700"]
+    ports    = ["22", "80", "443", "2700"]
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["firewall"]
+  target_tags   = ["nostr-relayer"]
 }
 
 resource "google_compute_address" "static" {
@@ -63,7 +68,7 @@ resource "google_compute_instance" "nostr-relayer" {
 
   provisioner "local-exec" {
     command = <<EOT
-    sleep 120 && \
+    sleep 20 && \
     > hosts && \
     echo "[relayer]" | tee -a hosts && \
     echo "${google_compute_address.static.address} ansible_user=ubuntu ansible_ssh_private_key_file=${var.private_keypath}" | tee -a hosts && \
