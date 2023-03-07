@@ -1,5 +1,3 @@
-MAKE="make"
-
 setup-gcp:
 	cp gcp/terraform.tfvars.example gcp/terraform.tfvars && echo "Generated a template terraform.tfvars for you. Fill this in!"
 
