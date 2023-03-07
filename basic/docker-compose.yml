@@ -14,9 +14,6 @@ services:
     ports:
       - 2700:2700
     command: "./basic/relayer-basic"
-    networks:
-      - default
-      - caddy
 
   postgres:
     image: postgres
@@ -33,22 +30,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: caddy
-    ports:
-      - 80:80
-      - 443:443
-    networks:
-      - caddy
-      - default
-    volumes:
-      - ./caddy/config/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy_data/data:/data
-      - ./caddy_data/config:/config
-    restart: unless-stopped
-
-networks:
-  caddy:
-    name: caddy     
