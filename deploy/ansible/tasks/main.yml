@@ -1,11 +1,11 @@
 ---
-- name: Clone a github repository
+- name: Cloning relayer repository
   git:
     repo: https://github.com/fiatjaf/relayer.git
     dest: /opt/relayer/
     clone: yes
 
-- name: Run `docker-compose up`
+- name: Bringing up relayer basic via docker compose
   docker_compose:
     project_src: /opt/relayer/basic
     build: no
