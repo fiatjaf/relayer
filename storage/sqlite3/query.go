@@ -101,13 +101,11 @@ func (b SQLite3Backend) QueryEvents(filter *nostr.Filter) (events []nostr.Event,
 		}
 	}
 
-	if len(tagQuery) > 0 {
-
-		// Naive implementation
-		for _, tagValue := range tagQuery {
-			params = append(params, "%"+tagValue+"%")
-			conditions = append(conditions, "tags LIKE ?")
-		}
+	// we use a very bad implementation in which we only check the tag values and
+	// ignore the tag names
+	for _, tagValue := range tagQuery {
+		params = append(params, "%"+tagValue+"%")
+		conditions = append(conditions, "tags LIKE ?")
 	}
 
 	if filter.Since != nil {
