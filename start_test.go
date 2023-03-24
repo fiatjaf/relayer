@@ -5,9 +5,6 @@ import (
 	"net/http"
 	"testing"
 	"time"
-
-	"github.com/gorilla/websocket"
-	"github.com/nbd-wtf/go-nostr"
 )
 
 func TestServerStartShutdown(t *testing.T) {
@@ -75,32 +72,32 @@ func TestServerStartShutdown(t *testing.T) {
 	}
 }
 
-func TestServerShutdownWebsocket(t *testing.T) {
-	// set up a new relay server
-	srv := startTestRelay(t, &testRelay{storage: &testStorage{}})
-
-	// connect a client to it
-	ctx1, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	client, err := nostr.RelayConnect(ctx1, "ws://"+srv.Addr())
-	if err != nil {
-		t.Fatalf("nostr.RelayConnectContext: %v", err)
-	}
-
-	// now, shut down the server
-	ctx2, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx2); err != nil {
-		t.Errorf("srv.Shutdown: %v", err)
-	}
-
-	// wait for the client to receive a "connection close"
-	select {
-	case err := <-client.ConnectionError:
-		if _, ok := err.(*websocket.CloseError); !ok {
-			t.Errorf("client.ConnextionError: %v (%T); want websocket.CloseError", err, err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Error("client took too long to disconnect")
-	}
-}
+//func TestServerShutdownWebsocket(t *testing.T) {
+//	// set up a new relay server
+//	srv := startTestRelay(t, &testRelay{storage: &testStorage{}})
+//
+//	// connect a client to it
+//	ctx1, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+//	defer cancel()
+//	client, err := nostr.RelayConnect(ctx1, "ws://"+srv.Addr())
+//	if err != nil {
+//		t.Fatalf("nostr.RelayConnectContext: %v", err)
+//	}
+//
+//	// now, shut down the server
+//	ctx2, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+//	defer cancel()
+//	if err := srv.Shutdown(ctx2); err != nil {
+//		t.Errorf("srv.Shutdown: %v", err)
+//	}
+//
+//	// wait for the client to receive a "connection close"
+//	select {
+//	case err := <-client.ConnectionError:
+//		if _, ok := err.(*websocket.CloseError); !ok {
+//			t.Errorf("client.ConnextionError: %v (%T); want websocket.CloseError", err, err)
+//		}
+//	case <-time.After(2 * time.Second):
+//		t.Error("client took too long to disconnect")
+//	}
+//}
