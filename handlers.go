@@ -137,6 +137,12 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
+					// reject events that have timestamps greater than 30 minutes in the future.
+					if evt.CreatedAt.After(time.Now().Add(30 * time.Minute)) {
+						ws.WriteJSON([]interface{}{"OK", evt.ID, false, "invalid: created is invalid"})
+						return
+					}
+
 					// check serialization
 					serialized := evt.Serialize()
 
