@@ -97,7 +97,12 @@ func (ess *ElasticsearchStorage) Init() error {
 }
 
 func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
-	// todo: is pubkey match required?
+	// first do get by ID and check that pubkeys match
+	// this is cheaper than doing delete by query, which also doesn't work with bulk indexer.
+	found, _ := ess.getByID(&nostr.Filter{IDs: []string{id}})
+	if len(found) == 0 || found[0].PubKey != pubkey {
+		return nil
+	}
 
 	done := make(chan error)
 	err := ess.bi.Add(
@@ -132,9 +137,9 @@ func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
 	return err
 }
 
-func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
+func (ess *ElasticsearchStorage) SaveEvent(evt *nostr.Event) error {
 	ie := &IndexedEvent{
-		Event: *event,
+		Event: *evt,
 	}
 
 	// post processing: index for FTS
@@ -144,8 +149,8 @@ func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
 	// - if it's valid JSON just index the "values" and not the keys
 	// - more content introspection: language detection
 	// - denormalization... attach profile + ranking signals to events
-	if event.Kind != 4 {
-		ie.ContentSearch = event.Content
+	if evt.Kind != 4 {
+		ie.ContentSearch = evt.Content
 	}
 
 	data, err := json.Marshal(ie)
@@ -155,13 +160,57 @@ func (ess *ElasticsearchStorage) SaveEvent(event *nostr.Event) error {
 
 	done := make(chan error)
 
+	// delete replaceable events
+	deleteIDs := []string{}
+	queryForDelete := func(filter *nostr.Filter) {
+		toDelete, _ := ess.QueryEvents(filter)
+		for _, e := range toDelete {
+			// KindRecommendServer: we can't query ES for exact content match
+			// so query by kind and loop over results to compare content
+			if evt.Kind == nostr.KindRecommendServer {
+				if e.Content == evt.Content {
+					deleteIDs = append(deleteIDs, e.ID)
+				}
+			} else {
+				deleteIDs = append(deleteIDs, e.ID)
+			}
+		}
+	}
+	if evt.Kind == nostr.KindSetMetadata || evt.Kind == nostr.KindContactList || evt.Kind == nostr.KindRecommendServer || (10000 <= evt.Kind && evt.Kind < 20000) {
+		// delete past events from this user
+		queryForDelete(&nostr.Filter{
+			Authors: []string{evt.PubKey},
+			Kinds:   []int{evt.Kind},
+		})
+	} else if evt.Kind >= 30000 && evt.Kind < 40000 {
+		// NIP-33
+		d := evt.Tags.GetFirst([]string{"d"})
+		if d != nil {
+			queryForDelete(&nostr.Filter{
+				Authors: []string{evt.PubKey},
+				Kinds:   []int{evt.Kind},
+				Tags: nostr.TagMap{
+					"d": []string{d.Value()},
+				},
+			})
+		}
+	}
+	for _, id := range deleteIDs {
+		ess.bi.Add(
+			context.Background(),
+			esutil.BulkIndexerItem{
+				Action:     "delete",
+				DocumentID: id,
+			})
+	}
+
 	// adapted from:
 	// https://github.com/elastic/go-elasticsearch/blob/main/_examples/bulk/indexer.go#L196
 	err = ess.bi.Add(
 		context.Background(),
 		esutil.BulkIndexerItem{
 			Action:     "index",
-			DocumentID: event.ID,
+			DocumentID: evt.ID,
 			Body:       bytes.NewReader(data),
 			OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
 				close(done)
