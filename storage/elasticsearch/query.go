@@ -172,6 +172,7 @@ func isGetByID(filter *nostr.Filter) bool {
 		len(filter.Authors) == 0 &&
 		len(filter.Kinds) == 0 &&
 		len(filter.Tags) == 0 &&
+		len(filter.Search) == 0 &&
 		filter.Since == nil &&
 		filter.Until == nil
 
