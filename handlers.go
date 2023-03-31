@@ -39,15 +39,18 @@ var upgrader = websocket.Upgrader{
 }
 
 func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
-	store := s.relay.Storage()
-	advancedDeleter, _ := store.(AdvancedDeleter)
-	advancedQuerier, _ := store.(AdvancedQuerier)
+	var (
+		store              = s.relay.Storage()
+		advancedDeleter, _ = store.(AdvancedDeleter)
+		advancedQuerier, _ = store.(AdvancedQuerier)
+	)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		s.Log.Errorf("failed to upgrade websocket: %v", err)
 		return
 	}
+
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 	s.clients[conn] = struct{}{}
@@ -107,15 +110,18 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			go func(message []byte) {
-				var notice string
+				var (
+					notice, typ string
+					request     []json.RawMessage
+				)
+
 				defer func() {
 					if notice != "" {
 						ws.WriteJSON([]interface{}{"NOTICE", notice})
 					}
 				}()
 
-				var request []json.RawMessage
-				if err := json.Unmarshal(message, &request); err != nil {
+				if err = json.Unmarshal(message, &request); err != nil {
 					// stop silently
 					return
 				}
@@ -125,14 +131,16 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				var typ string
-				json.Unmarshal(request[0], &typ)
+				if err = json.Unmarshal(request[0], &typ); err != nil {
+					notice = "failed to decode typ"
+					return
+				}
 
 				switch typ {
 				case "EVENT":
 					// it's a new event
 					var evt nostr.Event
-					if err := json.Unmarshal(request[1], &evt); err != nil {
+					if err = json.Unmarshal(request[1], &evt); err != nil {
 						notice = "failed to decode event: " + err.Error()
 						return
 					}
