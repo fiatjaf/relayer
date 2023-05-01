@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/rs/cors"
 )
 
 // Server is a base for package users to implement nostr relays.
@@ -37,6 +40,9 @@ type Server struct {
 	// keep a connection reference to all connected clients for Server.Shutdown
 	clientsMu sync.Mutex
 	clients   map[*websocket.Conn]struct{}
+
+	// in case you call Server.Start
+	httpServer *http.Server
 }
 
 // NewServer initializes the relay and its storage using their respective Init methods,
@@ -77,12 +83,38 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) Start(host string, port int) error {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	s.httpServer = &http.Server{
+		Handler:      cors.Default().Handler(s),
+		Addr:         addr,
+		WriteTimeout: 2 * time.Second,
+		ReadTimeout:  2 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+
+	if err := s.httpServer.Serve(ln); err == http.ErrServerClosed {
+		return nil
+	} else if err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
 // Shutdown sends a websocket close control message to all connected clients.
 //
 // If the relay is ShutdownAware, Shutdown calls its OnShutdown, passing the context as is.
 // Note that the HTTP server make some time to shutdown and so the context deadline,
 // if any, may have been shortened by the time OnShutdown is called.
 func (s *Server) Shutdown(ctx context.Context) {
+	s.httpServer.Shutdown(ctx)
+
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 	for conn := range s.clients {
