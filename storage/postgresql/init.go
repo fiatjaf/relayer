@@ -1,10 +1,13 @@
 package postgresql
 
 import (
+	"github.com/fiatjaf/relayer/v2"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/lib/pq"
 )
+
+var _ relayer.Storage = (*PostgresBackend)(nil)
 
 func (b *PostgresBackend) Init() error {
 	db, err := sqlx.Connect("postgres", b.DatabaseURL)

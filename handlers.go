@@ -241,6 +241,10 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 								break
 							}
 						}
+
+						// exhaust the channel (in case we broke out of it early) so it is closed by the storage
+						for range events {
+						}
 					}
 
 					ws.WriteJSON([]interface{}{"EOSE", id})

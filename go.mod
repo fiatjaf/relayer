@@ -1,4 +1,4 @@
-module github.com/fiatjaf/relayer
+module github.com/fiatjaf/relayer/v2
 
 go 1.18
 
@@ -7,7 +7,7 @@ require (
 	github.com/aquasecurity/esquery v0.2.0
 	github.com/cockroachdb/pebble v0.0.0-20220723153705-3fc374e4dc66
 	github.com/elastic/go-elasticsearch/v8 v8.6.0
-	github.com/gorilla/mux v1.8.0
+	github.com/fiatjaf/relayer v1.7.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/grokify/html-strip-tags-go v0.0.1
 	github.com/jb55/lnsocket/go v0.0.0-20220725174341-b98b5cd37bb6
@@ -18,7 +18,6 @@ require (
 	github.com/mmcdole/gofeed v1.1.3
 	github.com/nbd-wtf/go-nostr v0.17.1
 	github.com/rif/cache2go v1.0.0
-	github.com/rs/cors v1.7.0
 	github.com/stevelacy/daz v0.1.4
 	github.com/tidwall/gjson v1.14.1
 	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2
@@ -59,6 +58,7 @@ require (
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/kkdai/bstream v1.0.0 // indirect
@@ -79,6 +79,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect

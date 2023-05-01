@@ -1,10 +1,13 @@
 package sqlite3
 
 import (
+	"github.com/fiatjaf/relayer/v2"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+var _ relayer.Storage = (*SQLite3Backend)(nil)
 
 func (b *SQLite3Backend) Init() error {
 	db, err := sqlx.Connect("sqlite3", b.DatabaseURL)

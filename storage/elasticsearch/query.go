@@ -70,12 +70,12 @@ func buildDsl(filter *nostr.Filter) ([]byte, error) {
 
 	// since
 	if filter.Since != nil {
-		dsl.Must(esquery.Range("event.created_at").Gt(filter.Since.Unix()))
+		dsl.Must(esquery.Range("event.created_at").Gt(filter.Since))
 	}
 
 	// until
 	if filter.Until != nil {
-		dsl.Must(esquery.Range("event.created_at").Lt(filter.Until.Unix()))
+		dsl.Must(esquery.Range("event.created_at").Lt(filter.Until))
 	}
 
 	// search
@@ -86,7 +86,7 @@ func buildDsl(filter *nostr.Filter) ([]byte, error) {
 	return json.Marshal(esquery.Query(dsl))
 }
 
-func (ess *ElasticsearchStorage) getByID(filter *nostr.Filter) ([]nostr.Event, error) {
+func (ess *ElasticsearchStorage) getByID(filter *nostr.Filter) ([]*nostr.Event, error) {
 	got, err := ess.es.Mget(
 		esutil.NewJSONReader(filter),
 		ess.es.Mget.WithIndex(ess.IndexName))
@@ -104,24 +104,33 @@ func (ess *ElasticsearchStorage) getByID(filter *nostr.Filter) ([]nostr.Event, e
 		return nil, err
 	}
 
-	events := make([]nostr.Event, 0, len(mgetResponse.Docs))
+	events := make([]*nostr.Event, 0, len(mgetResponse.Docs))
 	for _, e := range mgetResponse.Docs {
 		if e.Found {
-			events = append(events, e.Source.Event)
+			events = append(events, &e.Source.Event)
 		}
 	}
 
 	return events, nil
 }
 
-func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
+func (ess *ElasticsearchStorage) QueryEvents(ctx context.Context, filter *nostr.Filter) (chan *nostr.Event, error) {
+	ch := make(chan *nostr.Event)
+
 	if filter == nil {
 		return nil, errors.New("filter cannot be null")
 	}
 
 	// optimization: get by id
 	if isGetByID(filter) {
-		return ess.getByID(filter)
+		if evts, err := ess.getByID(filter); err == nil {
+			for _, evt := range evts {
+				ch <- evt
+			}
+			close(ch)
+		} else {
+			return nil, fmt.Errorf("error getting by id: %w", err)
+		}
 	}
 
 	dsl, err := buildDsl(filter)
@@ -136,7 +145,7 @@ func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Even
 
 	es := ess.es
 	res, err := es.Search(
-		es.Search.WithContext(context.Background()),
+		es.Search.WithContext(ctx),
 		es.Search.WithIndex(ess.IndexName),
 
 		es.Search.WithBody(bytes.NewReader(dsl)),
@@ -159,12 +168,14 @@ func (ess *ElasticsearchStorage) QueryEvents(filter *nostr.Filter) ([]nostr.Even
 		return nil, err
 	}
 
-	events := make([]nostr.Event, len(r.Hits.Hits))
-	for i, e := range r.Hits.Hits {
-		events[i] = e.Source.Event
-	}
+	go func() {
+		for _, e := range r.Hits.Hits {
+			ch <- &e.Source.Event
+		}
+		close(ch)
+	}()
 
-	return events, nil
+	return ch, nil
 }
 
 func isGetByID(filter *nostr.Filter) bool {

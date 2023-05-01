@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 )
 
 func TestQuery(t *testing.T) {
-	now := time.Now()
-	yesterday := now.Add(time.Hour * -24)
+	now := nostr.Now()
+	yesterday := now - 60*60*24
 	filter := &nostr.Filter{
 		IDs:   []string{"abc", "123", "971b9489b4fd4e41a85951607922b982d981fa9d55318bc304f21f390721404c"},
 		Kinds: []int{0, 1},
@@ -31,7 +30,6 @@ func TestQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	pprint(dsl)
-
 }
 
 func pprint(j []byte) {

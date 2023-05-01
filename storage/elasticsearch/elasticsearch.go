@@ -12,8 +12,11 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
+	"github.com/fiatjaf/relayer/v2"
 	"github.com/nbd-wtf/go-nostr"
 )
+
+var _ relayer.Storage = (*ElasticsearchStorage)(nil)
 
 type IndexedEvent struct {
 	Event         nostr.Event `json:"event"`
@@ -53,7 +56,6 @@ type ElasticsearchStorage struct {
 }
 
 func (ess *ElasticsearchStorage) Init() error {
-
 	if ess.IndexName == "" {
 		ess.IndexName = "events"
 	}
@@ -96,7 +98,7 @@ func (ess *ElasticsearchStorage) Init() error {
 	return nil
 }
 
-func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
+func (ess *ElasticsearchStorage) DeleteEvent(ctx context.Context, id string, pubkey string) error {
 	// first do get by ID and check that pubkeys match
 	// this is cheaper than doing delete by query, which also doesn't work with bulk indexer.
 	found, _ := ess.getByID(&nostr.Filter{IDs: []string{id}})
@@ -106,7 +108,7 @@ func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
 
 	done := make(chan error)
 	err := ess.bi.Add(
-		context.Background(),
+		ctx,
 		esutil.BulkIndexerItem{
 			Action:     "delete",
 			DocumentID: id,
@@ -137,7 +139,7 @@ func (ess *ElasticsearchStorage) DeleteEvent(id string, pubkey string) error {
 	return err
 }
 
-func (ess *ElasticsearchStorage) SaveEvent(evt *nostr.Event) error {
+func (ess *ElasticsearchStorage) SaveEvent(ctx context.Context, evt *nostr.Event) error {
 	ie := &IndexedEvent{
 		Event: *evt,
 	}
@@ -163,8 +165,8 @@ func (ess *ElasticsearchStorage) SaveEvent(evt *nostr.Event) error {
 	// delete replaceable events
 	deleteIDs := []string{}
 	queryForDelete := func(filter *nostr.Filter) {
-		toDelete, _ := ess.QueryEvents(filter)
-		for _, e := range toDelete {
+		toDelete, _ := ess.QueryEvents(ctx, filter)
+		for e := range toDelete {
 			// KindRecommendServer: we can't query ES for exact content match
 			// so query by kind and loop over results to compare content
 			if evt.Kind == nostr.KindRecommendServer {
@@ -197,7 +199,7 @@ func (ess *ElasticsearchStorage) SaveEvent(evt *nostr.Event) error {
 	}
 	for _, id := range deleteIDs {
 		ess.bi.Add(
-			context.Background(),
+			ctx,
 			esutil.BulkIndexerItem{
 				Action:     "delete",
 				DocumentID: id,
@@ -207,7 +209,7 @@ func (ess *ElasticsearchStorage) SaveEvent(evt *nostr.Event) error {
 	// adapted from:
 	// https://github.com/elastic/go-elasticsearch/blob/main/_examples/bulk/indexer.go#L196
 	err = ess.bi.Add(
-		context.Background(),
+		ctx,
 		esutil.BulkIndexerItem{
 			Action:     "index",
 			DocumentID: evt.ID,

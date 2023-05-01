@@ -1,18 +1,20 @@
 package postgresql
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 )
 
-func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error) {
+func (b PostgresBackend) QueryEvents(ctx context.Context, filter *nostr.Filter) (ch chan *nostr.Event, err error) {
+	ch = make(chan *nostr.Event)
+
 	var conditions []string
 	var params []any
 
@@ -116,11 +118,11 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 
 	if filter.Since != nil {
 		conditions = append(conditions, "created_at > ?")
-		params = append(params, filter.Since.Unix())
+		params = append(params, filter.Since)
 	}
 	if filter.Until != nil {
 		conditions = append(conditions, "created_at < ?")
-		params = append(params, filter.Until.Unix())
+		params = append(params, filter.Until)
 	}
 
 	if len(conditions) == 0 {
@@ -145,19 +147,21 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
 	}
 
-	defer rows.Close()
-
-	for rows.Next() {
-		var evt nostr.Event
-		var timestamp int64
-		err := rows.Scan(&evt.ID, &evt.PubKey, &timestamp,
-			&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+	go func() {
+		defer rows.Close()
+		defer close(ch)
+		for rows.Next() {
+			var evt nostr.Event
+			var timestamp int64
+			err := rows.Scan(&evt.ID, &evt.PubKey, &timestamp,
+				&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
+			if err != nil {
+				return
+			}
+			evt.CreatedAt = nostr.Timestamp(timestamp)
+			ch <- &evt
 		}
-		evt.CreatedAt = time.Unix(timestamp, 0)
-		events = append(events, evt)
-	}
+	}()
 
-	return events, nil
+	return ch, nil
 }
