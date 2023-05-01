@@ -38,10 +38,10 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
-	store := s.relay.Storage()
+func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	store := s.relay.Storage(ctx)
 	advancedDeleter, _ := store.(AdvancedDeleter)
-	advancedQuerier, _ := store.(AdvancedQuerier)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -158,10 +158,10 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						for _, tag := range evt.Tags {
 							if len(tag) >= 2 && tag[0] == "e" {
 								if advancedDeleter != nil {
-									advancedDeleter.BeforeDelete(tag[1], evt.PubKey)
+									advancedDeleter.BeforeDelete(ctx, tag[1], evt.PubKey)
 								}
 
-								if err := store.DeleteEvent(tag[1], evt.PubKey); err != nil {
+								if err := store.DeleteEvent(ctx, tag[1], evt.PubKey); err != nil {
 									ws.WriteJSON([]interface{}{"OK", evt.ID, false, fmt.Sprintf("error: %s", err.Error())})
 									return
 								}
@@ -174,7 +174,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					ok, message := AddEvent(s.relay, evt)
+					ok, message := AddEvent(ctx, s.relay, evt)
 					ws.WriteJSON([]interface{}{"OK", evt.ID, ok, message})
 
 				case "REQ":
@@ -222,33 +222,27 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 							}
 						}
 
-						if advancedQuerier != nil {
-							advancedQuerier.BeforeQuery(filter)
-						}
-
-						events, err := store.QueryEvents(filter)
+						events, err := store.QueryEvents(ctx, filter)
 						if err != nil {
 							s.Log.Errorf("store: %v", err)
 							continue
 						}
 
-						if advancedQuerier != nil {
-							advancedQuerier.AfterQuery(events, filter)
+						// ensures the client won't be bombarded with events in case Storage doesn't do limits right
+						if filter.Limit == 0 {
+							filter.Limit = 9999999999
 						}
-
-						// this block should not trigger if the SQL query accounts for filter.Limit
-						// other implementations may be broken, and this ensures the client
-						// won't be bombarded.
-						if filter.Limit > 0 && len(events) > filter.Limit {
-							events = events[0:filter.Limit]
-						}
-
-						for _, event := range events {
+						i := 0
+						for event := range events {
 							ws.WriteJSON([]interface{}{"EVENT", id, event})
+
+							i++
+							if i > filter.Limit {
+								break
+							}
 						}
 					}
-					// moved EOSE out of for loop.
-					// otherwise subscriptions may be cancelled too early
+
 					ws.WriteJSON([]interface{}{"EOSE", id})
 					setListener(id, ws, filters)
 				case "CLOSE":
@@ -305,7 +299,7 @@ func (s *Server) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func (s *Server) handleNIP11(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	supportedNIPs := []int{9, 11, 12, 15, 16, 20, 33}

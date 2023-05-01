@@ -17,16 +17,13 @@ type Relay interface {
 	// to initialize its internal resources.
 	// Also see [Storage.Init].
 	Init() error
-	// OnInitialized is called by [Server.Start] right before starting to serve HTTP requests.
-	// It is passed the server to allow callers make final adjustments, such as custom routing.
-	OnInitialized(*Server)
 	// AcceptEvent is called for every nostr event received by the server.
 	// If the returned value is true, the event is passed on to [Storage.SaveEvent].
 	// Otherwise, the server responds with a negative and "blocked" message as described
 	// in NIP-20.
-	AcceptEvent(*nostr.Event) bool
+	AcceptEvent(context.Context, *nostr.Event) bool
 	// Storage returns the relay storage implementation.
-	Storage() Storage
+	Storage(context.Context) Storage
 }
 
 // Auther is the interface for implementing NIP-42.
@@ -73,27 +70,21 @@ type Storage interface {
 	Init() error
 
 	// QueryEvents is invoked upon a client's REQ as described in NIP-01.
-	QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error)
+	QueryEvents(ctx context.Context, filter *nostr.Filter) (chan *nostr.Event, error)
 	// DeleteEvent is used to handle deletion events, as per NIP-09.
-	DeleteEvent(id string, pubkey string) error
+	DeleteEvent(ctx context.Context, id string, pubkey string) error
 	// SaveEvent is called once Relay.AcceptEvent reports true.
-	SaveEvent(event *nostr.Event) error
-}
-
-// AdvancedQuerier methods are called before and after [Storage.QueryEvents].
-type AdvancedQuerier interface {
-	BeforeQuery(*nostr.Filter)
-	AfterQuery([]nostr.Event, *nostr.Filter)
+	SaveEvent(ctx context.Context, event *nostr.Event) error
 }
 
 // AdvancedDeleter methods are called before and after [Storage.DeleteEvent].
 type AdvancedDeleter interface {
-	BeforeDelete(id string, pubkey string)
+	BeforeDelete(ctx context.Context, id string, pubkey string)
 	AfterDelete(id string, pubkey string)
 }
 
 // AdvancedSaver methods are called before and after [Storage.SaveEvent].
 type AdvancedSaver interface {
-	BeforeSave(*nostr.Event)
+	BeforeSave(context.Context, *nostr.Event)
 	AfterSave(*nostr.Event)
 }

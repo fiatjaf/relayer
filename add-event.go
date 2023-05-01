@@ -1,17 +1,18 @@
 package relayer
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/fiatjaf/relayer/storage"
 	"github.com/nbd-wtf/go-nostr"
 )
 
-func AddEvent(relay Relay, evt nostr.Event) (accepted bool, message string) {
-	store := relay.Storage()
+func AddEvent(ctx context.Context, relay Relay, evt nostr.Event) (accepted bool, message string) {
+	store := relay.Storage(ctx)
 	advancedSaver, _ := store.(AdvancedSaver)
 
-	if !relay.AcceptEvent(&evt) {
+	if !relay.AcceptEvent(ctx, &evt) {
 		return false, "blocked: event blocked by relay"
 	}
 
@@ -19,10 +20,10 @@ func AddEvent(relay Relay, evt nostr.Event) (accepted bool, message string) {
 		// do not store ephemeral events
 	} else {
 		if advancedSaver != nil {
-			advancedSaver.BeforeSave(&evt)
+			advancedSaver.BeforeSave(ctx, &evt)
 		}
 
-		if saveErr := store.SaveEvent(&evt); saveErr != nil {
+		if saveErr := store.SaveEvent(ctx, &evt); saveErr != nil {
 			switch saveErr {
 			case storage.ErrDupEvent:
 				return true, saveErr.Error()
