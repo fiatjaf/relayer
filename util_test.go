@@ -3,44 +3,29 @@ package relayer
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 )
 
 func startTestRelay(t *testing.T, tr *testRelay) *Server {
 	t.Helper()
-	ready := make(chan struct{})
-
-	onInitializedFn := tr.onInitialized
-	tr.onInitialized = func(s *Server) {
-		close(ready)
-		if onInitializedFn != nil {
-			onInitializedFn(s)
-		}
-	}
-	srv := NewServer("127.0.0.1:0", tr)
-	go srv.Start()
-
-	select {
-	case <-ready:
-	case <-time.After(time.Second):
-		t.Fatal("server took too long to start up")
-	}
+	srv, _ := NewServer(tr)
+	started := make(chan bool)
+	go srv.Start("127.0.0.1", 0, started)
+	<-started
 	return srv
 }
 
 type testRelay struct {
-	name          string
-	storage       Storage
-	init          func() error
-	onInitialized func(*Server)
-	onShutdown    func(context.Context)
-	acceptEvent   func(*nostr.Event) bool
+	name        string
+	storage     Storage
+	init        func() error
+	onShutdown  func(context.Context)
+	acceptEvent func(*nostr.Event) bool
 }
 
-func (tr *testRelay) Name() string     { return tr.name }
-func (tr *testRelay) Storage() Storage { return tr.storage }
+func (tr *testRelay) Name() string                    { return tr.name }
+func (tr *testRelay) Storage(context.Context) Storage { return tr.storage }
 
 func (tr *testRelay) Init() error {
 	if fn := tr.init; fn != nil {
@@ -49,19 +34,13 @@ func (tr *testRelay) Init() error {
 	return nil
 }
 
-func (tr *testRelay) OnInitialized(s *Server) {
-	if fn := tr.onInitialized; fn != nil {
-		fn(s)
-	}
-}
-
 func (tr *testRelay) OnShutdown(ctx context.Context) {
 	if fn := tr.onShutdown; fn != nil {
 		fn(ctx)
 	}
 }
 
-func (tr *testRelay) AcceptEvent(e *nostr.Event) bool {
+func (tr *testRelay) AcceptEvent(ctx context.Context, e *nostr.Event) bool {
 	if fn := tr.acceptEvent; fn != nil {
 		return fn(e)
 	}
@@ -70,9 +49,9 @@ func (tr *testRelay) AcceptEvent(e *nostr.Event) bool {
 
 type testStorage struct {
 	init        func() error
-	queryEvents func(*nostr.Filter) ([]nostr.Event, error)
-	deleteEvent func(id string, pubkey string) error
-	saveEvent   func(*nostr.Event) error
+	queryEvents func(context.Context, *nostr.Filter) (chan *nostr.Event, error)
+	deleteEvent func(ctx context.Context, id string, pubkey string) error
+	saveEvent   func(context.Context, *nostr.Event) error
 }
 
 func (st *testStorage) Init() error {
@@ -82,23 +61,23 @@ func (st *testStorage) Init() error {
 	return nil
 }
 
-func (st *testStorage) QueryEvents(f *nostr.Filter) ([]nostr.Event, error) {
+func (st *testStorage) QueryEvents(ctx context.Context, f *nostr.Filter) (chan *nostr.Event, error) {
 	if fn := st.queryEvents; fn != nil {
-		return fn(f)
+		return fn(ctx, f)
 	}
 	return nil, nil
 }
 
-func (st *testStorage) DeleteEvent(id string, pubkey string) error {
+func (st *testStorage) DeleteEvent(ctx context.Context, id string, pubkey string) error {
 	if fn := st.deleteEvent; fn != nil {
-		return fn(id, pubkey)
+		return fn(ctx, id, pubkey)
 	}
 	return nil
 }
 
-func (st *testStorage) SaveEvent(e *nostr.Event) error {
+func (st *testStorage) SaveEvent(ctx context.Context, e *nostr.Event) error {
 	if fn := st.saveEvent; fn != nil {
-		return fn(e)
+		return fn(ctx, e)
 	}
 	return nil
 }

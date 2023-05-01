@@ -34,7 +34,6 @@ type Server struct {
 	// outputting to stderr.
 	Log Logger
 
-	addr  string
 	relay Relay
 
 	// keep a connection reference to all connected clients for Server.Shutdown
@@ -42,6 +41,7 @@ type Server struct {
 	clients   map[*websocket.Conn]struct{}
 
 	// in case you call Server.Start
+	Addr       string
 	httpServer *http.Server
 }
 
@@ -83,19 +83,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) Start(host string, port int) error {
+func (s *Server) Start(host string, port int, started ...chan bool) error {
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
+	s.Addr = ln.Addr().String()
 	s.httpServer = &http.Server{
 		Handler:      cors.Default().Handler(s),
 		Addr:         addr,
 		WriteTimeout: 2 * time.Second,
 		ReadTimeout:  2 * time.Second,
 		IdleTimeout:  30 * time.Second,
+	}
+
+	// notify caller that we're starting
+	for _, started := range started {
+		close(started)
 	}
 
 	if err := s.httpServer.Serve(ln); err == http.ErrServerClosed {
