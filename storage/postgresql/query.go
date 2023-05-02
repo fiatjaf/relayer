@@ -3,28 +3,55 @@ package postgresql
 import (
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nbd-wtf/go-nostr"
 )
 
 func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event, err error) {
+	query, params, err := queryEventsSql(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := b.DB.Query(query, params...)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var evt nostr.Event
+		var timestamp int64
+		err := rows.Scan(&evt.ID, &evt.PubKey, &timestamp,
+			&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		evt.CreatedAt = time.Unix(timestamp, 0)
+		events = append(events, evt)
+	}
+
+	return events, nil
+}
+
+func queryEventsSql(filter *nostr.Filter) (string, []any, error) {
 	var conditions []string
 	var params []any
 
 	if filter == nil {
-		err = errors.New("filter cannot be null")
-		return
+		return "", nil, fmt.Errorf("filter cannot be null")
 	}
 
 	if filter.IDs != nil {
 		if len(filter.IDs) > 500 {
 			// too many ids, fail everything
-			return
+			return "", nil, nil
 		}
 
 		likeids := make([]string, 0, len(filter.IDs))
@@ -39,7 +66,7 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 		}
 		if len(likeids) == 0 {
 			// ids being [] mean you won't get anything
-			return
+			return "", nil, nil
 		}
 		conditions = append(conditions, "("+strings.Join(likeids, " OR ")+")")
 	}
@@ -47,7 +74,7 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 	if filter.Authors != nil {
 		if len(filter.Authors) > 500 {
 			// too many authors, fail everything
-			return
+			return "", nil, nil
 		}
 
 		likekeys := make([]string, 0, len(filter.Authors))
@@ -62,7 +89,7 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 		}
 		if len(likekeys) == 0 {
 			// authors being [] mean you won't get anything
-			return
+			return "", nil, nil
 		}
 		conditions = append(conditions, "("+strings.Join(likekeys, " OR ")+")")
 	}
@@ -70,12 +97,12 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 	if filter.Kinds != nil {
 		if len(filter.Kinds) > 10 {
 			// too many kinds, fail everything
-			return
+			return "", nil, nil
 		}
 
 		if len(filter.Kinds) == 0 {
 			// kinds being [] mean you won't get anything
-			return
+			return "", nil, nil
 		}
 		// no sql injection issues since these are ints
 		inkinds := make([]string, len(filter.Kinds))
@@ -89,7 +116,7 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 	for _, values := range filter.Tags {
 		if len(values) == 0 {
 			// any tag set to [] is wrong
-			return
+			return "", nil, nil
 		}
 
 		// add these tags to the query
@@ -97,7 +124,7 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 
 		if len(tagQuery) > 10 {
 			// too many tags, fail everything
-			return
+			return "", nil, nil
 		}
 	}
 
@@ -134,30 +161,11 @@ func (b PostgresBackend) QueryEvents(filter *nostr.Filter) (events []nostr.Event
 		params = append(params, filter.Limit)
 	}
 
-	query := b.DB.Rebind(`SELECT
+	query := sqlx.Rebind(sqlx.BindType("postgres"), `SELECT
       id, pubkey, created_at, kind, tags, content, sig
-    FROM event WHERE ` +
-		strings.Join(conditions, " AND ") +
+    FROM event WHERE `+
+		strings.Join(conditions, " AND ")+
 		" ORDER BY created_at DESC LIMIT ?")
 
-	rows, err := b.DB.Query(query, params...)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
-	}
-
-	defer rows.Close()
-
-	for rows.Next() {
-		var evt nostr.Event
-		var timestamp int64
-		err := rows.Scan(&evt.ID, &evt.PubKey, &timestamp,
-			&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-		evt.CreatedAt = time.Unix(timestamp, 0)
-		events = append(events, evt)
-	}
-
-	return events, nil
+	return query, params, nil
 }
