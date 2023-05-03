@@ -1,6 +1,7 @@
 package relayer
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -107,6 +108,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			go func(message []byte) {
+				ctx = context.Background()
 				var notice string
 				defer func() {
 					if notice != "" {
