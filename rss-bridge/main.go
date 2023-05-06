@@ -75,7 +75,7 @@ func (relay *Relay) Init() error {
 						for _, item := range feed.Items {
 							evt := itemToTextNote(pubkey, item)
 							last, ok := relay.lastEmitted.Load(entity.URL)
-							if !ok || time.Unix(last.(int64), 0).Before(evt.CreatedAt) {
+							if !ok || time.Unix(last.(int64), 0).Before(evt.CreatedAt.Time()) {
 								evt.Sign(entity.PrivateKey)
 								relay.updates <- evt
 								relay.lastEmitted.Store(entity.URL, last)
@@ -137,10 +137,10 @@ func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
 			if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindSetMetadata) {
 				evt := feedToSetMetadata(pubkey, feed)
 
-				if filter.Since != nil && evt.CreatedAt.Before(*filter.Since) {
+				if filter.Since != nil && evt.CreatedAt.Time().Before(filter.Since.Time()) {
 					continue
 				}
-				if filter.Until != nil && evt.CreatedAt.After(*filter.Until) {
+				if filter.Until != nil && evt.CreatedAt.Time().After(filter.Until.Time()) {
 					continue
 				}
 
@@ -153,17 +153,17 @@ func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
 				for _, item := range feed.Items {
 					evt := itemToTextNote(pubkey, item)
 
-					if filter.Since != nil && evt.CreatedAt.Before(*filter.Since) {
+					if filter.Since != nil && evt.CreatedAt.Time().Before(filter.Since.Time()) {
 						continue
 					}
-					if filter.Until != nil && evt.CreatedAt.After(*filter.Until) {
+					if filter.Until != nil && evt.CreatedAt.Time().After(filter.Until.Time()) {
 						continue
 					}
 
 					evt.Sign(entity.PrivateKey)
 
-					if evt.CreatedAt.After(time.Unix(int64(last), 0)) {
-						last = uint32(evt.CreatedAt.Unix())
+					if evt.CreatedAt.Time().After(time.Unix(int64(last), 0)) {
+						last = uint32(evt.CreatedAt.Time().Unix())
 					}
 
 					evts = append(evts, evt)

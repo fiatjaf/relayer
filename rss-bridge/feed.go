@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/nbd-wtf/go-nostr"
 	strip "github.com/grokify/html-strip-tags-go"
 	"github.com/mmcdole/gofeed"
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/rif/cache2go"
 )
 
@@ -108,7 +108,7 @@ func feedToSetMetadata(pubkey string, feed *gofeed.Feed) nostr.Event {
 
 	evt := nostr.Event{
 		PubKey:    pubkey,
-		CreatedAt: createdAt,
+		CreatedAt: nostr.Timestamp(createdAt.Unix()),
 		Kind:      nostr.KindSetMetadata,
 		Tags:      nostr.Tags{},
 		Content:   string(content),
@@ -139,7 +139,7 @@ func itemToTextNote(pubkey string, item *gofeed.Item) nostr.Event {
 
 	evt := nostr.Event{
 		PubKey:    pubkey,
-		CreatedAt: createdAt,
+		CreatedAt: nostr.Timestamp(createdAt.Unix()),
 		Kind:      nostr.KindTextNote,
 		Tags:      nostr.Tags{},
 		Content:   content,
