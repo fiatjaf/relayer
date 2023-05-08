@@ -32,11 +32,6 @@ func (relay *Relay) Name() string {
 	return "relayer-rss-bridge"
 }
 
-func (r *Relay) OnInitialized(s *relayer.Server) {
-	s.Router().HandleFunc("/", handleWebpage)
-	s.Router().HandleFunc("/create", handleCreateFeed)
-}
-
 func (relay *Relay) Init() error {
 	err := envconfig.Process("", relay)
 	if err != nil {
@@ -188,6 +183,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create server: %v", err)
 	}
+	server.Router().HandleFunc("/", handleWebpage)
+	server.Router().HandleFunc("/create", handleCreateFeed)
 	if err := server.Start("0.0.0.0", 7447); err != nil {
 		log.Fatalf("server terminated: %v", err)
 	}
