@@ -42,16 +42,22 @@ type Server struct {
 
 	// in case you call Server.Start
 	Addr       string
+	serveMux   *http.ServeMux
 	httpServer *http.Server
+}
+
+func (s *Server) Router() *http.ServeMux {
+	return s.serveMux
 }
 
 // NewServer initializes the relay and its storage using their respective Init methods,
 // returning any non-nil errors, and returns a Server ready to listen for HTTP requests.
 func NewServer(relay Relay) (*Server, error) {
 	srv := &Server{
-		Log:     defaultLogger(relay.Name() + ": "),
-		relay:   relay,
-		clients: make(map[*websocket.Conn]struct{}),
+		Log:      defaultLogger(relay.Name() + ": "),
+		relay:    relay,
+		clients:  make(map[*websocket.Conn]struct{}),
+		serveMux: &http.ServeMux{},
 	}
 
 	// init the relay
@@ -80,6 +86,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.HandleWebsocket(w, r)
 	} else if r.Header.Get("Accept") == "application/nostr+json" {
 		s.HandleNIP11(w, r)
+	} else {
+		s.serveMux.ServeHTTP(w, r)
 	}
 }
 

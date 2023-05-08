@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 
-	"github.com/fiatjaf/relayer"
-	"github.com/fiatjaf/relayer/storage/postgresql"
+	"github.com/fiatjaf/relayer/v2"
+	"github.com/fiatjaf/relayer/v2/storage/postgresql"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -21,9 +22,7 @@ func (r *Relay) Name() string {
 	return "WhitelistedRelay"
 }
 
-func (r *Relay) OnInitialized(*relayer.Server) {}
-
-func (r *Relay) Storage() relayer.Storage {
+func (r *Relay) Storage(ctx context.Context) relayer.Storage {
 	return r.storage
 }
 
@@ -31,7 +30,7 @@ func (r *Relay) Init() error {
 	return nil
 }
 
-func (r *Relay) AcceptEvent(evt *nostr.Event) bool {
+func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) bool {
 	// disallow anything from non-authorized pubkeys
 	found := false
 	for _, pubkey := range r.Whitelist {
@@ -60,7 +59,11 @@ func main() {
 		return
 	}
 	r.storage = &postgresql.PostgresBackend{DatabaseURL: r.PostgresDatabase}
-	if err := relayer.Start(&r); err != nil {
+	server, err := relayer.NewServer(&r)
+	if err != nil {
+		log.Fatalf("failed to create server: %v", err)
+	}
+	if err := server.Start("0.0.0.0", 7447); err != nil {
 		log.Fatalf("server terminated: %v", err)
 	}
 }
