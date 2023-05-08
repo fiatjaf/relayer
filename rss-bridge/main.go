@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/fiatjaf/relayer"
+	"github.com/fiatjaf/relayer/v2"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nbd-wtf/go-nostr"
 	"golang.org/x/exp/slices"
@@ -32,8 +33,8 @@ func (relay *Relay) Name() string {
 }
 
 func (r *Relay) OnInitialized(s *relayer.Server) {
-	s.Router().Path("/").HandlerFunc(handleWebpage)
-	s.Router().Path("/create").HandlerFunc(handleCreateFeed)
+	s.Router().HandleFunc("/", handleWebpage)
+	s.Router().HandleFunc("/create", handleCreateFeed)
 }
 
 func (relay *Relay) Init() error {
@@ -90,11 +91,11 @@ func (relay *Relay) Init() error {
 	return nil
 }
 
-func (relay *Relay) AcceptEvent(_ *nostr.Event) bool {
+func (relay *Relay) AcceptEvent(ctx context.Context, _ *nostr.Event) bool {
 	return false
 }
 
-func (relay *Relay) Storage() relayer.Storage {
+func (relay *Relay) Storage(ctx context.Context) relayer.Storage {
 	return store{relay.db}
 }
 
@@ -103,55 +104,39 @@ type store struct {
 }
 
 func (b store) Init() error { return nil }
-func (b store) SaveEvent(_ *nostr.Event) error {
+func (b store) SaveEvent(ctx context.Context, _ *nostr.Event) error {
 	return errors.New("blocked: we don't accept any events")
 }
 
-func (b store) DeleteEvent(_, _ string) error {
+func (b store) DeleteEvent(ctx context.Context, id string, pubkey string) error {
 	return errors.New("blocked: we can't delete any events")
 }
 
-func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
-	var evts []nostr.Event
-
+func (b store) QueryEvents(ctx context.Context, filter *nostr.Filter) (chan *nostr.Event, error) {
 	if filter.IDs != nil || len(filter.Tags) > 0 {
-		return evts, nil
+		return nil, nil
 	}
 
-	for _, pubkey := range filter.Authors {
-		if val, closer, err := relay.db.Get([]byte(pubkey)); err == nil {
-			defer closer.Close()
+	evts := make(chan *nostr.Event)
+	go func() {
+		for _, pubkey := range filter.Authors {
+			if val, closer, err := relay.db.Get([]byte(pubkey)); err == nil {
+				defer closer.Close()
 
-			var entity Entity
-			if err := json.Unmarshal(val, &entity); err != nil {
-				log.Printf("got invalid json from db at key %s: %v", pubkey, err)
-				continue
-			}
-
-			feed, err := parseFeed(entity.URL)
-			if err != nil {
-				log.Printf("failed to parse feed at url %q: %v", entity.URL, err)
-				continue
-			}
-
-			if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindSetMetadata) {
-				evt := feedToSetMetadata(pubkey, feed)
-
-				if filter.Since != nil && evt.CreatedAt.Time().Before(filter.Since.Time()) {
-					continue
-				}
-				if filter.Until != nil && evt.CreatedAt.Time().After(filter.Until.Time()) {
+				var entity Entity
+				if err := json.Unmarshal(val, &entity); err != nil {
+					log.Printf("got invalid json from db at key %s: %v", pubkey, err)
 					continue
 				}
 
-				evt.Sign(entity.PrivateKey)
-				evts = append(evts, evt)
-			}
+				feed, err := parseFeed(entity.URL)
+				if err != nil {
+					log.Printf("failed to parse feed at url %q: %v", entity.URL, err)
+					continue
+				}
 
-			if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindTextNote) {
-				var last uint32 = 0
-				for _, item := range feed.Items {
-					evt := itemToTextNote(pubkey, item)
+				if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindSetMetadata) {
+					evt := feedToSetMetadata(pubkey, feed)
 
 					if filter.Since != nil && evt.CreatedAt.Time().Before(filter.Since.Time()) {
 						continue
@@ -161,18 +146,35 @@ func (b store) QueryEvents(filter *nostr.Filter) ([]nostr.Event, error) {
 					}
 
 					evt.Sign(entity.PrivateKey)
-
-					if evt.CreatedAt.Time().After(time.Unix(int64(last), 0)) {
-						last = uint32(evt.CreatedAt.Time().Unix())
-					}
-
-					evts = append(evts, evt)
+					evts <- &evt
 				}
 
-				relay.lastEmitted.Store(entity.URL, last)
+				if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindTextNote) {
+					var last uint32 = 0
+					for _, item := range feed.Items {
+						evt := itemToTextNote(pubkey, item)
+
+						if filter.Since != nil && evt.CreatedAt.Time().Before(filter.Since.Time()) {
+							continue
+						}
+						if filter.Until != nil && evt.CreatedAt.Time().After(filter.Until.Time()) {
+							continue
+						}
+
+						evt.Sign(entity.PrivateKey)
+
+						if evt.CreatedAt.Time().After(time.Unix(int64(last), 0)) {
+							last = uint32(evt.CreatedAt.Time().Unix())
+						}
+
+						evts <- &evt
+					}
+
+					relay.lastEmitted.Store(entity.URL, last)
+				}
 			}
 		}
-	}
+	}()
 
 	return evts, nil
 }
@@ -182,7 +184,11 @@ func (relay *Relay) InjectEvents() chan nostr.Event {
 }
 
 func main() {
-	if err := relayer.Start(relay); err != nil {
+	server, err := relayer.NewServer(relay)
+	if err != nil {
+		log.Fatalf("failed to create server: %v", err)
+	}
+	if err := server.Start("0.0.0.0", 7447); err != nil {
 		log.Fatalf("server terminated: %v", err)
 	}
 }

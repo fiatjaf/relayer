@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/fiatjaf/relayer/storage"
+	"github.com/fiatjaf/relayer/v2/storage"
 	"github.com/nbd-wtf/go-nostr"
 )
 
