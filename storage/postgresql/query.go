@@ -51,8 +51,7 @@ func (b PostgresBackend) CountEvents(ctx context.Context, filter *nostr.Filter) 
 	}
 
 	var count int64
-	err = b.DB.QueryRow(query, params...).Scan(&count)
-	if err != nil && err != sql.ErrNoRows {
+	if err = b.DB.QueryRow(query, params...).Scan(&count); err != nil && err != sql.ErrNoRows {
 		return 0, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
 	}
 	return count, nil
