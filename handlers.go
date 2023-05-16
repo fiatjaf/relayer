@@ -196,10 +196,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					total := int64(0)
 					filters := make(nostr.Filters, len(request)-2)
 					for i, filterReq := range request[2:] {
-						if err := json.Unmarshal(
-							filterReq,
-							&filters[i],
-						); err != nil {
+						if err := json.Unmarshal(filterReq, &filters[i]); err != nil {
 							notice = "failed to decode filter"
 							return
 						}
