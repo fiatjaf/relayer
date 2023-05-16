@@ -90,3 +90,7 @@ type AdvancedSaver interface {
 	BeforeSave(context.Context, *nostr.Event)
 	AfterSave(*nostr.Event)
 }
+
+type EventCounter interface {
+	CountEvents(ctx context.Context, filter *nostr.Filter) (int64, error)
+}

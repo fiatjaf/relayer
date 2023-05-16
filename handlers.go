@@ -179,6 +179,68 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					ok, message := AddEvent(ctx, s.relay, evt)
 					ws.WriteJSON([]interface{}{"OK", evt.ID, ok, message})
 
+				case "COUNT":
+					counter, ok := store.(EventCounter)
+					if !ok {
+						notice = "restricted: this relay does not support NIP-45"
+						return
+					}
+
+					var id string
+					json.Unmarshal(request[1], &id)
+					if id == "" {
+						notice = "COUNT has no <id>"
+						return
+					}
+
+					total := int64(0)
+					filters := make(nostr.Filters, len(request)-2)
+					for i, filterReq := range request[2:] {
+						if err := json.Unmarshal(
+							filterReq,
+							&filters[i],
+						); err != nil {
+							notice = "failed to decode filter"
+							return
+						}
+
+						filter := &filters[i]
+
+						// prevent kind-4 events from being returned to unauthed users,
+						//   only when authentication is a thing
+						if _, ok := s.relay.(Auther); ok {
+							if slices.Contains(filter.Kinds, 4) {
+								senders := filter.Authors
+								receivers, _ := filter.Tags["p"]
+								switch {
+								case ws.authed == "":
+									// not authenticated
+									notice = "restricted: this relay does not serve kind-4 to unauthenticated users, does your client implement NIP-42?"
+									return
+								case len(senders) == 1 && len(receivers) < 2 && (senders[0] == ws.authed):
+									// allowed filter: ws.authed is sole sender (filter specifies one or all receivers)
+								case len(receivers) == 1 && len(senders) < 2 && (receivers[0] == ws.authed):
+									// allowed filter: ws.authed is sole receiver (filter specifies one or all senders)
+								default:
+									// restricted filter: do not return any events,
+									//   even if other elements in filters array were not restricted).
+									//   client should know better.
+									notice = "restricted: authenticated user does not have authorization for requested filters."
+									return
+								}
+							}
+						}
+
+						count, err := counter.CountEvents(ctx, filter)
+						if err != nil {
+							s.Log.Errorf("store: %v", err)
+							continue
+						}
+						total += count
+					}
+
+					ws.WriteJSON([]interface{}{"COUNT", id, map[string]int64{"count": total}})
+					setListener(id, ws, filters)
 				case "REQ":
 					var id string
 					json.Unmarshal(request[1], &id)
