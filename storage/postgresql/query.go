@@ -15,7 +15,7 @@ import (
 func (b PostgresBackend) QueryEvents(ctx context.Context, filter *nostr.Filter) (ch chan *nostr.Event, err error) {
 	ch = make(chan *nostr.Event)
 
-	query, params, err := queryEventsSql(filter)
+	query, params, err := queryEventsSql(filter, false)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,20 @@ func (b PostgresBackend) QueryEvents(ctx context.Context, filter *nostr.Filter) 
 	return ch, nil
 }
 
-func queryEventsSql(filter *nostr.Filter) (string, []any, error) {
+func (b PostgresBackend) CountEvents(ctx context.Context, filter *nostr.Filter) (int64, error) {
+	query, params, err := queryEventsSql(filter, true)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	if err = b.DB.QueryRow(query, params...).Scan(&count); err != nil && err != sql.ErrNoRows {
+		return 0, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
+	}
+	return count, nil
+}
+
+func queryEventsSql(filter *nostr.Filter, doCount bool) (string, []any, error) {
 	var conditions []string
 	var params []any
 
@@ -165,11 +178,20 @@ func queryEventsSql(filter *nostr.Filter) (string, []any, error) {
 		params = append(params, filter.Limit)
 	}
 
-	query := sqlx.Rebind(sqlx.BindType("postgres"), `SELECT
-      id, pubkey, created_at, kind, tags, content, sig
-    FROM event WHERE `+
-		strings.Join(conditions, " AND ")+
-		" ORDER BY created_at DESC LIMIT ?")
+	var query string
+	if doCount {
+		query = sqlx.Rebind(sqlx.BindType("postgres"), `SELECT
+          COUNT(*)
+        FROM event WHERE `+
+			strings.Join(conditions, " AND ")+
+			" ORDER BY created_at DESC LIMIT ?")
+	} else {
+		query = sqlx.Rebind(sqlx.BindType("postgres"), `SELECT
+          id, pubkey, created_at, kind, tags, content, sig
+        FROM event WHERE `+
+			strings.Join(conditions, " AND ")+
+			" ORDER BY created_at DESC LIMIT ?")
+	}
 
 	return query, params, nil
 }

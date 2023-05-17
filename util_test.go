@@ -52,6 +52,7 @@ type testStorage struct {
 	queryEvents func(context.Context, *nostr.Filter) (chan *nostr.Event, error)
 	deleteEvent func(ctx context.Context, id string, pubkey string) error
 	saveEvent   func(context.Context, *nostr.Event) error
+	countEvents func(context.Context, *nostr.Filter) (int64, error)
 }
 
 func (st *testStorage) Init() error {
@@ -80,4 +81,11 @@ func (st *testStorage) SaveEvent(ctx context.Context, e *nostr.Event) error {
 		return fn(ctx, e)
 	}
 	return nil
+}
+
+func (st *testStorage) CountEvents(ctx context.Context, f *nostr.Filter) (int64, error) {
+	if fn := st.countEvents; fn != nil {
+		return fn(ctx, f)
+	}
+	return 0, nil
 }

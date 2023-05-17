@@ -2,11 +2,12 @@ package relayer
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/gobwas/ws/wsutil"
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -83,7 +84,10 @@ func TestServerShutdownWebsocket(t *testing.T) {
 	// wait for the client to receive a "connection close"
 	time.Sleep(1 * time.Second)
 	err = client.ConnectionError
-	if _, ok := err.(*websocket.CloseError); !ok {
-		t.Errorf("client.ConnextionError: %v (%T); want websocket.CloseError", err, err)
+	if e := errors.Unwrap(err); e != nil {
+		err = e
+	}
+	if _, ok := err.(wsutil.ClosedError); !ok {
+		t.Errorf("client.ConnextionError: %v (%T); want wsutil.ClosedError", err, err)
 	}
 }

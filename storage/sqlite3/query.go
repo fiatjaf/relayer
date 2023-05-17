@@ -4,29 +4,72 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/nbd-wtf/go-nostr"
 )
 
 func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (ch chan *nostr.Event, err error) {
 	ch = make(chan *nostr.Event)
 
+	query, params, err := queryEventsSql(filter, false)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := b.DB.Query(query, params...)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
+	}
+
+	go func() {
+		defer rows.Close()
+		defer close(ch)
+		for rows.Next() {
+			var evt nostr.Event
+			var timestamp int64
+			err := rows.Scan(&evt.ID, &evt.PubKey, &timestamp,
+				&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
+			if err != nil {
+				return
+			}
+			evt.CreatedAt = nostr.Timestamp(timestamp)
+			ch <- &evt
+		}
+	}()
+
+	return ch, nil
+}
+
+func (b SQLite3Backend) CountEvents(ctx context.Context, filter *nostr.Filter) (int64, error) {
+	query, params, err := queryEventsSql(filter, true)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	err = b.DB.QueryRow(query, params...).Scan(&count)
+	if err != nil && err != sql.ErrNoRows {
+		return 0, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
+	}
+	return count, nil
+}
+
+func queryEventsSql(filter *nostr.Filter, doCount bool) (string, []any, error) {
 	var conditions []string
 	var params []any
 
 	if filter == nil {
-		err = errors.New("filter cannot be null")
-		return
+		return "", nil, fmt.Errorf("filter cannot be null")
 	}
 
 	if filter.IDs != nil {
 		if len(filter.IDs) > 500 {
 			// too many ids, fail everything
-			return
+			return "", nil, nil
 		}
 
 		likeids := make([]string, 0, len(filter.IDs))
@@ -41,7 +84,7 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 		}
 		if len(likeids) == 0 {
 			// ids being [] mean you won't get anything
-			return
+			return "", nil, nil
 		}
 		conditions = append(conditions, "("+strings.Join(likeids, " OR ")+")")
 	}
@@ -49,7 +92,7 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 	if filter.Authors != nil {
 		if len(filter.Authors) > 500 {
 			// too many authors, fail everything
-			return
+			return "", nil, nil
 		}
 
 		likekeys := make([]string, 0, len(filter.Authors))
@@ -64,7 +107,7 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 		}
 		if len(likekeys) == 0 {
 			// authors being [] mean you won't get anything
-			return
+			return "", nil, nil
 		}
 		conditions = append(conditions, "("+strings.Join(likekeys, " OR ")+")")
 	}
@@ -72,12 +115,12 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 	if filter.Kinds != nil {
 		if len(filter.Kinds) > 10 {
 			// too many kinds, fail everything
-			return
+			return "", nil, nil
 		}
 
 		if len(filter.Kinds) == 0 {
 			// kinds being [] mean you won't get anything
-			return
+			return "", nil, nil
 		}
 		// no sql injection issues since these are ints
 		inkinds := make([]string, len(filter.Kinds))
@@ -91,7 +134,7 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 	for _, values := range filter.Tags {
 		if len(values) == 0 {
 			// any tag set to [] is wrong
-			return
+			return "", nil, nil
 		}
 
 		// add these tags to the query
@@ -99,7 +142,7 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 
 		if len(tagQuery) > 10 {
 			// too many tags, fail everything
-			return
+			return "", nil, nil
 		}
 	}
 
@@ -134,32 +177,20 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 		params = append(params, filter.Limit)
 	}
 
-	query := b.DB.Rebind(`SELECT
-      id, pubkey, created_at, kind, tags, content, sig
-    FROM event WHERE ` +
-		strings.Join(conditions, " AND ") +
-		" ORDER BY created_at DESC LIMIT ?")
-
-	rows, err := b.DB.Query(query, params...)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
+	var query string
+	if doCount {
+		query = sqlx.Rebind(sqlx.BindType("sqlite3"), `SELECT
+          COUNT(*)
+        FROM event WHERE `+
+			strings.Join(conditions, " AND ")+
+			" ORDER BY created_at DESC LIMIT ?")
+	} else {
+		query = sqlx.Rebind(sqlx.BindType("sqlite3"), `SELECT
+          id, pubkey, created_at, kind, tags, content, sig
+        FROM event WHERE `+
+			strings.Join(conditions, " AND ")+
+			" ORDER BY created_at DESC LIMIT ?")
 	}
 
-	go func() {
-		defer rows.Close()
-		defer close(ch)
-		for rows.Next() {
-			var evt nostr.Event
-			var timestamp int64
-			err := rows.Scan(&evt.ID, &evt.PubKey, &timestamp,
-				&evt.Kind, &evt.Tags, &evt.Content, &evt.Sig)
-			if err != nil {
-				return
-			}
-			evt.CreatedAt = nostr.Timestamp(timestamp)
-			ch <- &evt
-		}
-	}()
-
-	return ch, nil
+	return query, params, nil
 }
