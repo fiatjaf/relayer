@@ -371,6 +371,11 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.relay.(Auther); ok {
 		supportedNIPs = append(supportedNIPs, 42)
 	}
+	if storage, ok := s.relay.(Storage); ok && storage != nil {
+		if _, ok = storage.(EventCounter); ok {
+			supportedNIPs = append(supportedNIPs, 45)
+		}
+	}
 
 	info := nip11.RelayInformationDocument{
 		Name:          s.relay.Name(),
