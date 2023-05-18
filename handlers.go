@@ -237,7 +237,6 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					}
 
 					ws.WriteJSON([]interface{}{"COUNT", id, map[string]int64{"count": total}})
-					setListener(id, ws, filters)
 				case "REQ":
 					var id string
 					json.Unmarshal(request[1], &id)
