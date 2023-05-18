@@ -7,6 +7,7 @@ require (
 	github.com/aquasecurity/esquery v0.2.0
 	github.com/cockroachdb/pebble v0.0.0-20220723153705-3fc374e4dc66
 	github.com/elastic/go-elasticsearch/v8 v8.6.0
+	github.com/gobwas/ws v1.2.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/grokify/html-strip-tags-go v0.0.1
 	github.com/jb55/lnsocket/go v0.0.0-20220725174341-b98b5cd37bb6
@@ -15,12 +16,12 @@ require (
 	github.com/lib/pq v1.10.3
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/mmcdole/gofeed v1.1.3
-	github.com/nbd-wtf/go-nostr v0.18.0
+	github.com/nbd-wtf/go-nostr v0.18.3
 	github.com/rif/cache2go v1.0.0
 	github.com/rs/cors v1.7.0
 	github.com/stevelacy/daz v0.1.4
 	github.com/stretchr/testify v1.8.0
-	github.com/tidwall/gjson v1.14.1
+	github.com/tidwall/gjson v1.14.4
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
 )
 
@@ -59,7 +60,6 @@ require (
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/gobwas/ws v1.2.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
