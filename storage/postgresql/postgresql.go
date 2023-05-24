@@ -7,4 +7,5 @@ import (
 type PostgresBackend struct {
 	*sqlx.DB
 	DatabaseURL string
+	QueryLimit  int
 }
