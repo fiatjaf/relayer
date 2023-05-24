@@ -15,7 +15,7 @@ import (
 func (b PostgresBackend) QueryEvents(ctx context.Context, filter *nostr.Filter) (ch chan *nostr.Event, err error) {
 	ch = make(chan *nostr.Event)
 
-	query, params, err := queryEventsSql(filter, false)
+	query, params, err := b.queryEventsSql(filter, false)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (b PostgresBackend) QueryEvents(ctx context.Context, filter *nostr.Filter) 
 }
 
 func (b PostgresBackend) CountEvents(ctx context.Context, filter *nostr.Filter) (int64, error) {
-	query, params, err := queryEventsSql(filter, true)
+	query, params, err := b.queryEventsSql(filter, true)
 	if err != nil {
 		return 0, err
 	}
@@ -57,7 +57,7 @@ func (b PostgresBackend) CountEvents(ctx context.Context, filter *nostr.Filter) 
 	return count, nil
 }
 
-func queryEventsSql(filter *nostr.Filter, doCount bool) (string, []any, error) {
+func (b PostgresBackend) queryEventsSql(filter *nostr.Filter, doCount bool) (string, []any, error) {
 	var conditions []string
 	var params []any
 
@@ -172,8 +172,8 @@ func queryEventsSql(filter *nostr.Filter, doCount bool) (string, []any, error) {
 		conditions = append(conditions, "true")
 	}
 
-	if filter.Limit < 1 || filter.Limit > 100 {
-		params = append(params, 100)
+	if filter.Limit < 1 || filter.Limit > b.QueryLimit {
+		params = append(params, b.QueryLimit)
 	} else {
 		params = append(params, filter.Limit)
 	}

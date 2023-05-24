@@ -12,21 +12,52 @@ import (
 
 func TestQueryEventsSql(t *testing.T) {
 	var tests = []struct {
-		name   string
-		filter *nostr.Filter
-		query  string
-		params []any
-		err    error
+		name    string
+		backend PostgresBackend
+		filter  *nostr.Filter
+		query   string
+		params  []any
+		err     error
 	}{
 		{
-			name:   "empty filter",
-			filter: &nostr.Filter{},
+			name:    "empty filter",
+			backend: PostgresBackend{QueryLimit: 100},
+			filter:  &nostr.Filter{},
+			query:   "SELECT id, pubkey, created_at, kind, tags, content, sig FROM event WHERE true ORDER BY created_at DESC LIMIT $1",
+			params:  []any{100},
+			err:     nil,
+		},
+		{
+			name:    "large query limit",
+			backend: PostgresBackend{QueryLimit: 1000},
+			filter:  &nostr.Filter{},
+			query:   "SELECT id, pubkey, created_at, kind, tags, content, sig FROM event WHERE true ORDER BY created_at DESC LIMIT $1",
+			params:  []any{1000},
+			err:     nil,
+		},
+		{
+			name:    "valid filter limit",
+			backend: PostgresBackend{QueryLimit: 100},
+			filter: &nostr.Filter{
+				Limit: 50,
+			},
+			query:  "SELECT id, pubkey, created_at, kind, tags, content, sig FROM event WHERE true ORDER BY created_at DESC LIMIT $1",
+			params: []any{50},
+			err:    nil,
+		},
+		{
+			name:    "too large filter limit",
+			backend: PostgresBackend{QueryLimit: 100},
+			filter: &nostr.Filter{
+				Limit: 2000,
+			},
 			query:  "SELECT id, pubkey, created_at, kind, tags, content, sig FROM event WHERE true ORDER BY created_at DESC LIMIT $1",
 			params: []any{100},
 			err:    nil,
 		},
 		{
-			name: "ids filter",
+			name:    "ids filter",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				IDs: []string{"083ec57f36a7b39ab98a57bedab4f85355b2ee89e4b205bed58d7c3ef9edd294"},
 			},
@@ -38,7 +69,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err:    nil,
 		},
 		{
-			name: "kind filter",
+			name:    "kind filter",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Kinds: []int{1, 2, 3},
 			},
@@ -50,7 +82,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err:    nil,
 		},
 		{
-			name: "authors filter",
+			name:    "authors filter",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Authors: []string{"7bdef7bdebb8721f77927d0e77c66059360fa62371fdf15f3add93923a613229"},
 			},
@@ -63,14 +96,16 @@ func TestQueryEventsSql(t *testing.T) {
 		},
 		// errors
 		{
-			name:   "nil filter",
-			filter: nil,
-			query:  "",
-			params: nil,
-			err:    fmt.Errorf("filter cannot be null"),
+			name:    "nil filter",
+			backend: PostgresBackend{QueryLimit: 100},
+			filter:  nil,
+			query:   "",
+			params:  nil,
+			err:     fmt.Errorf("filter cannot be null"),
 		},
 		{
-			name: "too many ids",
+			name:    "too many ids",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				IDs: strSlice(501),
 			},
@@ -80,7 +115,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "invalid ids",
+			name:    "invalid ids",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				IDs: []string{"stuff"},
 			},
@@ -90,7 +126,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "too many authors",
+			name:    "too many authors",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Authors: strSlice(501),
 			},
@@ -100,7 +137,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "invalid authors",
+			name:    "invalid authors",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Authors: []string{"stuff"},
 			},
@@ -110,7 +148,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "too many kinds",
+			name:    "too many kinds",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Kinds: intSlice(11),
 			},
@@ -120,7 +159,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "no kinds",
+			name:    "no kinds",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Kinds: []int{},
 			},
@@ -130,7 +170,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "tags of empty array",
+			name:    "tags of empty array",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Tags: nostr.TagMap{
 					"#e": []string{},
@@ -142,7 +183,8 @@ func TestQueryEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "too many tag values",
+			name:    "too many tag values",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Tags: nostr.TagMap{
 					"#e": strSlice(11),
@@ -157,7 +199,7 @@ func TestQueryEventsSql(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, params, err := queryEventsSql(tt.filter, false)
+			query, params, err := tt.backend.queryEventsSql(tt.filter, false)
 			assert.Equal(t, tt.err, err)
 			if err != nil {
 				return
@@ -191,21 +233,24 @@ func strSlice(n int) []string {
 
 func TestCountEventsSql(t *testing.T) {
 	var tests = []struct {
-		name   string
-		filter *nostr.Filter
-		query  string
-		params []any
-		err    error
+		name    string
+		backend PostgresBackend
+		filter  *nostr.Filter
+		query   string
+		params  []any
+		err     error
 	}{
 		{
-			name:   "empty filter",
-			filter: &nostr.Filter{},
-			query:  "SELECT COUNT(*) FROM event WHERE true ORDER BY created_at DESC LIMIT $1",
-			params: []any{100},
-			err:    nil,
+			name:    "empty filter",
+			backend: PostgresBackend{QueryLimit: 100},
+			filter:  &nostr.Filter{},
+			query:   "SELECT COUNT(*) FROM event WHERE true ORDER BY created_at DESC LIMIT $1",
+			params:  []any{100},
+			err:     nil,
 		},
 		{
-			name: "ids filter",
+			name:    "ids filter",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				IDs: []string{"083ec57f36a7b39ab98a57bedab4f85355b2ee89e4b205bed58d7c3ef9edd294"},
 			},
@@ -217,7 +262,8 @@ func TestCountEventsSql(t *testing.T) {
 			err:    nil,
 		},
 		{
-			name: "kind filter",
+			name:    "kind filter",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Kinds: []int{1, 2, 3},
 			},
@@ -229,7 +275,8 @@ func TestCountEventsSql(t *testing.T) {
 			err:    nil,
 		},
 		{
-			name: "authors filter",
+			name:    "authors filter",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Authors: []string{"7bdef7bdebb8721f77927d0e77c66059360fa62371fdf15f3add93923a613229"},
 			},
@@ -242,14 +289,16 @@ func TestCountEventsSql(t *testing.T) {
 		},
 		// errors
 		{
-			name:   "nil filter",
-			filter: nil,
-			query:  "",
-			params: nil,
-			err:    fmt.Errorf("filter cannot be null"),
+			name:    "nil filter",
+			backend: PostgresBackend{QueryLimit: 100},
+			filter:  nil,
+			query:   "",
+			params:  nil,
+			err:     fmt.Errorf("filter cannot be null"),
 		},
 		{
-			name: "too many ids",
+			name:    "too many ids",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				IDs: strSlice(501),
 			},
@@ -259,7 +308,8 @@ func TestCountEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "invalid ids",
+			name:    "invalid ids",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				IDs: []string{"stuff"},
 			},
@@ -269,7 +319,8 @@ func TestCountEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "too many authors",
+			name:    "too many authors",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Authors: strSlice(501),
 			},
@@ -279,7 +330,8 @@ func TestCountEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "invalid authors",
+			name:    "invalid authors",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Authors: []string{"stuff"},
 			},
@@ -289,7 +341,8 @@ func TestCountEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "too many kinds",
+			name:    "too many kinds",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Kinds: intSlice(11),
 			},
@@ -299,7 +352,8 @@ func TestCountEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "no kinds",
+			name:    "no kinds",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Kinds: []int{},
 			},
@@ -309,7 +363,8 @@ func TestCountEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "tags of empty array",
+			name:    "tags of empty array",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Tags: nostr.TagMap{
 					"#e": []string{},
@@ -321,7 +376,8 @@ func TestCountEventsSql(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "too many tag values",
+			name:    "too many tag values",
+			backend: PostgresBackend{QueryLimit: 100},
 			filter: &nostr.Filter{
 				Tags: nostr.TagMap{
 					"#e": strSlice(11),
@@ -336,7 +392,7 @@ func TestCountEventsSql(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query, params, err := queryEventsSql(tt.filter, true)
+			query, params, err := tt.backend.queryEventsSql(tt.filter, true)
 			assert.Equal(t, tt.err, err)
 			if err != nil {
 				return

@@ -46,5 +46,9 @@ CREATE INDEX IF NOT EXISTS timeidx ON event (created_at DESC);
 CREATE INDEX IF NOT EXISTS kindidx ON event (kind);
 CREATE INDEX IF NOT EXISTS arbitrarytagvalues ON event USING gin (tagvalues);
     `)
+
+	if b.QueryLimit < 1 {
+		b.QueryLimit = 100
+	}
 	return err
 }
