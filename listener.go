@@ -17,9 +17,7 @@ func GetListeningFilters() nostr.Filters {
 	var respfilters = make(nostr.Filters, 0, len(listeners)*2)
 
 	listenersMutex.Lock()
-	defer func() {
-		listenersMutex.Unlock()
-	}()
+	defer listenersMutex.Unlock()
 
 	// here we go through all the existing listeners
 	for _, connlisteners := range listeners {
@@ -48,9 +46,7 @@ func GetListeningFilters() nostr.Filters {
 
 func setListener(id string, ws *WebSocket, filters nostr.Filters) {
 	listenersMutex.Lock()
-	defer func() {
-		listenersMutex.Unlock()
-	}()
+	defer listenersMutex.Unlock()
 
 	subs, ok := listeners[ws]
 	if !ok {
@@ -58,20 +54,15 @@ func setListener(id string, ws *WebSocket, filters nostr.Filters) {
 		listeners[ws] = subs
 	}
 
-	subs[id] = &Listener{
-		filters: filters,
-	}
+	subs[id] = &Listener{filters: filters}
 }
 
 // Remove a specific subscription id from listeners for a given ws client
 func removeListenerId(ws *WebSocket, id string) {
 	listenersMutex.Lock()
-	defer func() {
-		listenersMutex.Unlock()
-	}()
+	defer listenersMutex.Unlock()
 
-	subs, ok := listeners[ws]
-	if ok {
+	if subs, ok := listeners[ws]; ok {
 		delete(listeners[ws], id)
 		if len(subs) == 0 {
 			delete(listeners, ws)
@@ -83,18 +74,12 @@ func removeListenerId(ws *WebSocket, id string) {
 func removeListener(ws *WebSocket) {
 	listenersMutex.Lock()
 	defer listenersMutex.Unlock()
-
-	_, ok := listeners[ws]
-	if ok {
-		delete(listeners, ws)
-	}
+	delete(listeners, ws)
 }
 
 func notifyListeners(event *nostr.Event) {
 	listenersMutex.Lock()
-	defer func() {
-		listenersMutex.Unlock()
-	}()
+	defer listenersMutex.Unlock()
 
 	for ws, subs := range listeners {
 		for id, listener := range subs {
