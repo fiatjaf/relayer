@@ -14,7 +14,7 @@ func (b *PostgresBackend) SaveEvent(ctx context.Context, evt *nostr.Event) error
 		_, _ = b.DB.ExecContext(ctx, deleteQuery, deleteParams...)
 	}
 
-	sql, params, _ := saveEventSql(evt)
+	sql, params := saveEventSql(evt)
 	res, err := b.DB.ExecContext(ctx, sql, params...)
 	if err != nil {
 		return err
@@ -74,16 +74,9 @@ func deleteBeforeSaveSql(evt *nostr.Event) (string, []any, bool) {
 	return query, params, shouldDelete
 }
 
-func saveEventSql(evt *nostr.Event) (string, []any, error) {
-	const query = `INSERT INTO event (
-	id, pubkey, created_at, kind, tags, content, sig)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
-	ON CONFLICT (id) DO NOTHING`
-
-	var (
-		tagsj, _ = json.Marshal(evt.Tags)
-		params   = []any{evt.ID, evt.PubKey, evt.CreatedAt, evt.Kind, tagsj, evt.Content, evt.Sig}
-	)
-
-	return query, params, nil
+func saveEventSql(evt *nostr.Event) (string, []any) {
+	const query = `INSERT INTO event (id, pubkey, created_at, kind, tags, content, sig) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING`
+	tagsj, _ := json.Marshal(evt.Tags)
+	params := []any{evt.ID, evt.PubKey, evt.CreatedAt, evt.Kind, tagsj, evt.Content, evt.Sig}
+	return query, params
 }
