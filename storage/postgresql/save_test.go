@@ -138,7 +138,10 @@ func TestSaveEventSql(t *testing.T) {
 				Content:   "test",
 				Sig:       "sig",
 			},
-			query:  `INSERT INTO event (id, pubkey, created_at, kind, tags, content, sig) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING`,
+			query: `INSERT INTO event (
+	id, pubkey, created_at, kind, tags, content, sig)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	ON CONFLICT (id) DO NOTHING`,
 			params: []any{"id", "pk", now, nostr.KindTextNote, []byte("null"), "test", "sig"},
 		},
 		{
@@ -152,7 +155,10 @@ func TestSaveEventSql(t *testing.T) {
 				Content:   "test",
 				Sig:       "sig",
 			},
-			query:  `INSERT INTO event (id, pubkey, created_at, kind, tags, content, sig) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING`,
+			query: `INSERT INTO event (
+	id, pubkey, created_at, kind, tags, content, sig)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	ON CONFLICT (id) DO NOTHING`,
 			params: []any{"id", "pk", now, nostr.KindTextNote, []byte("[[\"foo\",\"bar\"]]"), "test", "sig"},
 		},
 	}
