@@ -14,8 +14,9 @@ services:
         condition: service_healthy
     ports:
       - 2700:2700
+      - 7447:7447
     volumes:
-      - ./nostres:/bin/relay
+      - ./nostres:/bin
     command: "/bin/relay"
 
   elasticsearch:
