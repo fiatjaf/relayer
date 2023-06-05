@@ -7,6 +7,14 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const (
+	queryLimit        = 100
+	queryIDsLimit     = 500
+	queryAuthorsLimit = 500
+	queryKindsLimit   = 10
+	queryTagsLimit    = 10
+)
+
 var _ relayer.Storage = (*PostgresBackend)(nil)
 
 func (b *PostgresBackend) Init() error {
@@ -47,8 +55,20 @@ CREATE INDEX IF NOT EXISTS kindidx ON event (kind);
 CREATE INDEX IF NOT EXISTS arbitrarytagvalues ON event USING gin (tagvalues);
     `)
 
-	if b.QueryLimit < 1 {
-		b.QueryLimit = 100
+	if b.QueryLimit == 0 {
+		b.QueryLimit = queryLimit
+	}
+	if b.QueryIDsLimit == 0 {
+		b.QueryIDsLimit = queryIDsLimit
+	}
+	if b.QueryAuthorsLimit == 0 {
+		b.QueryAuthorsLimit = queryAuthorsLimit
+	}
+	if b.QueryKindsLimit == 0 {
+		b.QueryKindsLimit = queryKindsLimit
+	}
+	if b.QueryTagsLimit == 0 {
+		b.QueryTagsLimit = queryTagsLimit
 	}
 	return err
 }
