@@ -243,11 +243,6 @@ func (ess *ElasticsearchStorage) CountEvents(ctx context.Context, filter *nostr.
 		return 0, err
 	}
 
-	limit := 1000
-	if filter.Limit > 0 && filter.Limit < limit {
-		limit = filter.Limit
-	}
-
 	es := ess.es
 	res, err := es.Count(
 		es.Count.WithContext(ctx),
