@@ -29,6 +29,10 @@ type EsSearchResult struct {
 	}
 }
 
+type EsCountResult struct {
+	Count int64
+}
+
 func buildDsl(filter *nostr.Filter) ([]byte, error) {
 	dsl := esquery.Bool()
 
@@ -216,4 +220,56 @@ func toInterfaceSlice(slice interface{}) []interface{} {
 	}
 
 	return ret
+}
+
+func (ess *ElasticsearchStorage) CountEvents(ctx context.Context, filter *nostr.Filter) (int64, error) {
+	if filter == nil {
+		return 0, errors.New("filter cannot be null")
+	}
+
+	count := int64(0)
+
+	// optimization: get by id
+	if isGetByID(filter) {
+		if evts, err := ess.getByID(filter); err == nil {
+			count += int64(len(evts))
+		} else {
+			return 0, fmt.Errorf("error getting by id: %w", err)
+		}
+	}
+
+	dsl, err := buildDsl(filter)
+	if err != nil {
+		return 0, err
+	}
+
+	limit := 1000
+	if filter.Limit > 0 && filter.Limit < limit {
+		limit = filter.Limit
+	}
+
+	es := ess.es
+	res, err := es.Count(
+		es.Count.WithContext(ctx),
+		es.Count.WithIndex(ess.IndexName),
+
+		es.Count.WithBody(bytes.NewReader(dsl)),
+	)
+	if err != nil {
+		log.Fatalf("Error getting response: %s", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		txt, _ := io.ReadAll(res.Body)
+		fmt.Println("oh no", string(txt))
+		return 0, fmt.Errorf("%s", txt)
+	}
+
+	var r EsCountResult
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		return 0, err
+	}
+
+	return r.Count + count, nil
 }
