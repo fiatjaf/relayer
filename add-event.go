@@ -8,11 +8,16 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-func AddEvent(ctx context.Context, relay Relay, evt nostr.Event) (accepted bool, message string) {
+// AddEvent has a business rule to add an event to the relayer
+func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool, message string) {
+	if evt == nil {
+		return false, ""
+	}
+
 	store := relay.Storage(ctx)
 	advancedSaver, _ := store.(AdvancedSaver)
 
-	if !relay.AcceptEvent(ctx, &evt) {
+	if !relay.AcceptEvent(ctx, evt) {
 		return false, "blocked: event blocked by relay"
 	}
 
@@ -20,10 +25,10 @@ func AddEvent(ctx context.Context, relay Relay, evt nostr.Event) (accepted bool,
 		// do not store ephemeral events
 	} else {
 		if advancedSaver != nil {
-			advancedSaver.BeforeSave(ctx, &evt)
+			advancedSaver.BeforeSave(ctx, evt)
 		}
 
-		if saveErr := store.SaveEvent(ctx, &evt); saveErr != nil {
+		if saveErr := store.SaveEvent(ctx, evt); saveErr != nil {
 			switch saveErr {
 			case storage.ErrDupEvent:
 				return true, saveErr.Error()
@@ -33,11 +38,11 @@ func AddEvent(ctx context.Context, relay Relay, evt nostr.Event) (accepted bool,
 		}
 
 		if advancedSaver != nil {
-			advancedSaver.AfterSave(&evt)
+			advancedSaver.AfterSave(evt)
 		}
 	}
 
-	notifyListeners(&evt)
+	notifyListeners(evt)
 
 	return true, ""
 }

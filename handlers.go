@@ -176,7 +176,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					ok, message := AddEvent(ctx, s.relay, evt)
+					ok, message := AddEvent(ctx, s.relay, &evt)
 					ws.WriteJSON([]interface{}{"OK", evt.ID, ok, message})
 
 				case "COUNT":
