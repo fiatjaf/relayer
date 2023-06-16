@@ -85,7 +85,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 		// NIP-42 auth challenge
 		if _, ok := s.relay.(Auther); ok {
-			ws.WriteJSON([]interface{}{"AUTH", ws.challenge})
+			ws.WriteJSON(nostr.AuthEnvelope{Challenge: &ws.challenge})
 		}
 
 		for {
@@ -112,7 +112,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				var notice string
 				defer func() {
 					if notice != "" {
-						ws.WriteJSON([]interface{}{"NOTICE", notice})
+						ws.WriteJSON(nostr.NoticeEnvelope(notice))
 					}
 				}()
 
@@ -148,10 +148,12 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					// check signature (requires the ID to be set)
 					if ok, err := evt.CheckSignature(); err != nil {
-						ws.WriteJSON([]interface{}{"OK", evt.ID, false, "error: failed to verify signature"})
+						reason := "error: failed to verify signature"
+						ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
 						return
 					} else if !ok {
-						ws.WriteJSON([]interface{}{"OK", evt.ID, false, "invalid: signature is invalid"})
+						reason := "invalid: signature is invalid"
+						ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
 						return
 					}
 
@@ -164,7 +166,8 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 								}
 
 								if err := store.DeleteEvent(ctx, tag[1], evt.PubKey); err != nil {
-									ws.WriteJSON([]interface{}{"OK", evt.ID, false, fmt.Sprintf("error: %s", err.Error())})
+									reason := fmt.Sprintf("error: %s", err.Error())
+									ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
 									return
 								}
 
@@ -177,8 +180,11 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					}
 
 					ok, message := AddEvent(ctx, s.relay, &evt)
-					ws.WriteJSON([]interface{}{"OK", evt.ID, ok, message})
-
+					var reason *string
+					if message != "" {
+						reason = &message
+					}
+					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: ok, Reason: reason})
 				case "COUNT":
 					counter, ok := store.(EventCounter)
 					if !ok {
@@ -294,8 +300,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 						i := 0
 						for event := range events {
-							ws.WriteJSON([]interface{}{"EVENT", id, event})
-
+							ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
 							i++
 							if i > filter.Limit {
 								break
@@ -307,7 +312,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 
-					ws.WriteJSON([]interface{}{"EOSE", id})
+					ws.WriteJSON(nostr.EOSEEnvelope(id))
 					setListener(id, ws, filters)
 				case "CLOSE":
 					var id string
@@ -327,9 +332,10 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 						if pubkey, ok := nip42.ValidateAuthEvent(&evt, ws.challenge, auther.ServiceURL()); ok {
 							ws.authed = pubkey
-							ws.WriteJSON([]interface{}{"OK", evt.ID, true, "authentication success"})
+							ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
 						} else {
-							ws.WriteJSON([]interface{}{"OK", evt.ID, false, "error: failed to authenticate"})
+							reason := "error: failed to authenticate"
+							ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
 						}
 					}
 				default:

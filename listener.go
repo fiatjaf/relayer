@@ -10,11 +10,13 @@ type Listener struct {
 	filters nostr.Filters
 }
 
-var listeners = make(map[*WebSocket]map[string]*Listener)
-var listenersMutex = sync.Mutex{}
+var (
+	listeners      = make(map[*WebSocket]map[string]*Listener)
+	listenersMutex = sync.Mutex{}
+)
 
 func GetListeningFilters() nostr.Filters {
-	var respfilters = make(nostr.Filters, 0, len(listeners)*2)
+	respfilters := make(nostr.Filters, 0, len(listeners)*2)
 
 	listenersMutex.Lock()
 	defer listenersMutex.Unlock()
@@ -86,7 +88,7 @@ func notifyListeners(event *nostr.Event) {
 			if !listener.filters.Match(event) {
 				continue
 			}
-			ws.WriteJSON([]interface{}{"EVENT", id, event})
+			ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
 		}
 	}
 }
