@@ -60,12 +60,13 @@ func NewServer(relay Relay) (*Server, error) {
 		serveMux: &http.ServeMux{},
 	}
 
+	if err := relay.Storage(context.Background()).Init(); err != nil {
+		return nil, fmt.Errorf("storage init: %w", err)
+	}
+
 	// init the relay
 	if err := relay.Init(); err != nil {
 		return nil, fmt.Errorf("relay init: %w", err)
-	}
-	if err := relay.Storage(context.Background()).Init(); err != nil {
-		return nil, fmt.Errorf("storage init: %w", err)
 	}
 
 	// start listening from events from other sources, if any
