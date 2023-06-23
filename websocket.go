@@ -3,7 +3,7 @@ package relayer
 import (
 	"sync"
 
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
 )
 
 type WebSocket struct {
