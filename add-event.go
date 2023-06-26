@@ -3,10 +3,13 @@ package relayer
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"github.com/fiatjaf/relayer/v2/storage"
 	"github.com/nbd-wtf/go-nostr"
 )
+
+var nip20prefixmatcher = regexp.MustCompile(`^\w+: `)
 
 // AddEvent has a business rule to add an event to the relayer
 func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool, message string) {
@@ -33,7 +36,12 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 			case storage.ErrDupEvent:
 				return true, saveErr.Error()
 			default:
-				return false, fmt.Sprintf("error: failed to save: %s", saveErr.Error())
+				errmsg := saveErr.Error()
+				if nip20prefixmatcher.MatchString(errmsg) {
+					return false, errmsg
+				} else {
+					return false, fmt.Sprintf("error: failed to save (%s)", errmsg)
+				}
 			}
 		}
 
