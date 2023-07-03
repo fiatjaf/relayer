@@ -15,6 +15,7 @@ import (
 
 type Relay struct {
 	PostgresDatabase string `envconfig:"POSTGRESQL_DATABASE"`
+	Port             int    `envconfig:"PORT"`
 
 	storage *postgresql.PostgresBackend
 }
@@ -67,7 +68,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create server: %v", err)
 	}
-	if err := server.Start("0.0.0.0", 7447); err != nil {
+	if err := server.Start("0.0.0.0", r.Port); err != nil {
 		log.Fatalf("server terminated: %v", err)
 	}
 }
