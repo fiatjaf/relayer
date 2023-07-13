@@ -88,6 +88,6 @@ func TestServerShutdownWebsocket(t *testing.T) {
 		err = e
 	}
 	if _, ok := err.(wsutil.ClosedError); !ok {
-		t.Errorf("client.ConnextionError: %v (%T); want wsutil.ClosedError", err, err)
+		t.Errorf("client.ConnectionError: %v (%T); want wsutil.ClosedError", err, err)
 	}
 }
