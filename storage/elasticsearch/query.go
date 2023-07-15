@@ -74,12 +74,12 @@ func buildDsl(filter *nostr.Filter) ([]byte, error) {
 
 	// since
 	if filter.Since != nil {
-		dsl.Must(esquery.Range("event.created_at").Gt(filter.Since))
+		dsl.Must(esquery.Range("event.created_at").Gte(filter.Since))
 	}
 
 	// until
 	if filter.Until != nil {
-		dsl.Must(esquery.Range("event.created_at").Lt(filter.Until))
+		dsl.Must(esquery.Range("event.created_at").Lte(filter.Until))
 	}
 
 	// search

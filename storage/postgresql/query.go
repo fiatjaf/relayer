@@ -159,11 +159,11 @@ func (b PostgresBackend) queryEventsSql(filter *nostr.Filter, doCount bool) (str
 	}
 
 	if filter.Since != nil {
-		conditions = append(conditions, "created_at > ?")
+		conditions = append(conditions, "created_at >= ?")
 		params = append(params, filter.Since)
 	}
 	if filter.Until != nil {
-		conditions = append(conditions, "created_at < ?")
+		conditions = append(conditions, "created_at <= ?")
 		params = append(params, filter.Until)
 	}
 
