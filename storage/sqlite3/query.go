@@ -154,11 +154,11 @@ func queryEventsSql(filter *nostr.Filter, doCount bool) (string, []any, error) {
 	}
 
 	if filter.Since != nil {
-		conditions = append(conditions, "created_at > ?")
+		conditions = append(conditions, "created_at >= ?")
 		params = append(params, filter.Since)
 	}
 	if filter.Until != nil {
-		conditions = append(conditions, "created_at < ?")
+		conditions = append(conditions, "created_at <= ?")
 		params = append(params, filter.Until)
 	}
 	if filter.Search != "" {
