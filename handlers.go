@@ -15,6 +15,7 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip11"
 	"github.com/nbd-wtf/go-nostr/nip42"
 	"golang.org/x/exp/slices"
+	"golang.org/x/time/rate"
 )
 
 // TODO: consider moving these to Server as config params
@@ -63,6 +64,13 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		challenge: hex.EncodeToString(challenge),
 	}
 
+	if s.options.perConnectionLimiter != nil {
+		ws.limiter = rate.NewLimiter(
+			s.options.perConnectionLimiter.Limit(),
+			s.options.perConnectionLimiter.Burst(),
+		)
+	}
+
 	// reader
 	go func() {
 		defer func() {
@@ -100,6 +108,15 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					s.Log.Warningf("unexpected close error from %s: %v", r.Header.Get("X-Forwarded-For"), err)
 				}
 				break
+			}
+
+			if ws.limiter != nil {
+				// NOTE: Wait will throttle the requests.
+				// To reject requests exceeding the limit, use if !ws.limiter.Allow()
+				if err := ws.limiter.Wait(context.Background()); err != nil {
+					s.Log.Warningf("unexpected limiter error %v", err)
+					continue
+				}
 			}
 
 			if typ == websocket.PingMessage {
