@@ -13,6 +13,7 @@ import (
 
 	"github.com/fasthttp/websocket"
 	"github.com/rs/cors"
+	"golang.org/x/time/rate"
 )
 
 // Server is a base for package users to implement nostr relays.
@@ -34,6 +35,8 @@ type Server struct {
 	// outputting to stderr.
 	Log Logger
 
+	options *Options
+
 	relay Relay
 
 	// keep a connection reference to all connected clients for Server.Shutdown
@@ -52,12 +55,18 @@ func (s *Server) Router() *http.ServeMux {
 
 // NewServer initializes the relay and its storage using their respective Init methods,
 // returning any non-nil errors, and returns a Server ready to listen for HTTP requests.
-func NewServer(relay Relay) (*Server, error) {
+func NewServer(relay Relay, opts ...Option) (*Server, error) {
+	options := DefaultOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	srv := &Server{
 		Log:      defaultLogger(relay.Name() + ": "),
 		relay:    relay,
 		clients:  make(map[*websocket.Conn]struct{}),
 		serveMux: &http.ServeMux{},
+		options:  options,
 	}
 
 	// init the relay
@@ -139,6 +148,22 @@ func (s *Server) Shutdown(ctx context.Context) {
 
 	if f, ok := s.relay.(ShutdownAware); ok {
 		f.OnShutdown(ctx)
+	}
+}
+
+type Option func(*Options)
+
+type Options struct {
+	perConnectionLimiter *rate.Limiter
+}
+
+func DefaultOptions() *Options {
+	return &Options{}
+}
+
+func WithPerConnectionLimiter(rps rate.Limit, burst int) Option {
+	return func(o *Options) {
+		o.perConnectionLimiter = rate.NewLimiter(rps, burst)
 	}
 }
 
