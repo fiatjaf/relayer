@@ -23,6 +23,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/tidwall/gjson v1.14.4
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
+	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 )
 
 require (
