@@ -317,6 +317,24 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 						i := 0
 						for event := range events {
+							// prevent kind-4 events from being returned to unauthed users,
+							//   only when authentication is a thing
+							if _, ok := s.relay.(Auther); ok {
+								if event.Kind == 4 {
+									sender := event.PubKey
+									receivers := event.Tags.GetAll([]string{"p"})
+									switch {
+									case ws.authed == "":
+										continue
+									case len(receivers) < 2 && (sender == ws.authed):
+										// allowed event: ws.authed is sole sender
+									case len(receivers) == 1 && (receivers[0][1] == ws.authed):
+										// allowed event: ws.authed is sole receiver
+									default:
+										continue
+									}
+								}
+							}
 							ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
 							i++
 							if i > filter.Limit {
