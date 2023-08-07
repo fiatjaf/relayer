@@ -317,6 +317,14 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 						i := 0
 						for event := range events {
+							if event.Kind == 4 {
+								if _, ok := s.relay.(Auther); !ok || ws.authed == "" {
+									continue
+								}
+								if event.PubKey != ws.authed && !event.Tags.ContainsAny("p", []string{ws.authed}) {
+									continue
+								}
+							}
 							ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
 							i++
 							if i > filter.Limit {
