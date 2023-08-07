@@ -44,18 +44,30 @@ func TestNip42(t *testing.T) {
 		t.Fatalf("nostr.RelayConnectContext: %v", err)
 	}
 
-	filters := []nostr.Filter{
+	sub1, err := client1.Subscribe(ctx, []nostr.Filter{
 		{
 			Kinds:   []int{nostr.KindEncryptedDirectMessage},
 			Authors: []string{pk1},
 		},
 		{
 			Kinds: []int{nostr.KindEncryptedDirectMessage},
-			Tags:  nostr.TagMap{"p": {pk2}},
+			Tags:  nostr.TagMap{"p": {pk1}},
 		},
+	})
+	if err != nil {
+		t.Fatalf("relay.Subscribe: %v", err)
 	}
 
-	sub2, err := client2.Subscribe(ctx, filters)
+	sub2, err := client2.Subscribe(ctx, []nostr.Filter{
+		{
+			Kinds:   []int{nostr.KindEncryptedDirectMessage},
+			Authors: []string{pk2},
+		},
+		{
+			Kinds: []int{nostr.KindEncryptedDirectMessage},
+			Tags:  nostr.TagMap{"p": {pk2}},
+		},
+	})
 	if err != nil {
 		t.Fatalf("relay.Subscribe: %v", err)
 	}
@@ -95,6 +107,15 @@ func TestNip42(t *testing.T) {
 	}
 
 	select {
+	case e2 := <-sub1.Events:
+		if e.ID != e2.ID {
+			t.Fatalf("wrong message: %v %v", e, e2)
+		}
+	case <-time.After(time.Second * 2):
+		t.Fatalf("no reply from relay.")
+	}
+
+	select {
 	case e2 := <-sub2.Events:
 		if e.ID != e2.ID {
 			t.Fatalf("wrong message: %v %v", e, e2)
@@ -103,15 +124,13 @@ func TestNip42(t *testing.T) {
 		t.Fatalf("no reply from relay.")
 	}
 
-	unauthed_filters := []nostr.Filter{{
-		Limit: 1,
-	}}
-
 	client3, err := nostr.RelayConnect(ctx, "ws://"+srv.Addr)
 	if err != nil {
 		t.Fatalf("unauthed nostr.RelayConnect: %v", err)
 	}
-	sub3, err := client3.Subscribe(ctx, unauthed_filters)
+	sub3, err := client3.Subscribe(ctx, []nostr.Filter{{
+		Limit: 1,
+	}})
 	if err != nil {
 		t.Fatalf("client3.Subscribe: %v", err)
 	}
