@@ -17,11 +17,13 @@ func (b SQLite3Backend) QueryEvents(ctx context.Context, filter *nostr.Filter) (
 
 	query, params, err := queryEventsSql(filter, false)
 	if err != nil {
+		close(ch)
 		return nil, err
 	}
 
 	rows, err := b.DB.Query(query, params...)
 	if err != nil && err != sql.ErrNoRows {
+		close(ch)
 		return nil, fmt.Errorf("failed to fetch events using query %q: %w", query, err)
 	}
 
