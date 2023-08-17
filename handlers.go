@@ -55,7 +55,6 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	s.clients[conn] = struct{}{}
 	ticker := time.NewTicker(pingPeriod)
 	stop := make(chan struct{})
-	defer close(stop)
 
 	// NIP-42 challenge
 	challenge := make([]byte, 8)
