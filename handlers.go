@@ -77,6 +77,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ticker.Stop()
 			stop <- struct{}{}
+			close(stop)
 			s.clientsMu.Lock()
 			if _, ok := s.clients[conn]; ok {
 				conn.Close()
@@ -387,7 +388,6 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			case <-stop:
-				close(stop)
 				return
 			}
 		}
