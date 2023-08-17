@@ -387,6 +387,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			case <-stop:
+				close(stop)
 				return
 			}
 		}
