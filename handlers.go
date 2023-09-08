@@ -139,7 +139,6 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 				var request []json.RawMessage
 				if err := json.Unmarshal(message, &request); err != nil {
-					// stop silently
 					return
 				}
 
@@ -155,7 +154,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				case "EVENT":
 					// it's a new event
 					var evt nostr.Event
-					if err := json.Unmarshal(request[1], &evt); err != nil {
+					if err := json.Unmarshal(request[2], &evt); err != nil {
 						notice = "failed to decode event: " + err.Error()
 						return
 					}
@@ -235,7 +234,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						if _, ok := s.relay.(Auther); ok {
 							if slices.Contains(filter.Kinds, 4) {
 								senders := filter.Authors
-								receivers, _ := filter.Tags["p"]
+								receivers := filter.Tags["p"]
 								switch {
 								case ws.authed == "":
 									// not authenticated
@@ -289,7 +288,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						if _, ok := s.relay.(Auther); ok {
 							if slices.Contains(filter.Kinds, 4) {
 								senders := filter.Authors
-								receivers, _ := filter.Tags["p"]
+								receivers := filter.Tags["p"]
 								switch {
 								case ws.authed == "":
 									// not authenticated
