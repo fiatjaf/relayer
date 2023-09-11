@@ -152,9 +152,10 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 				switch typ {
 				case "EVENT":
+					latestInex := len(request) - 1
 					// it's a new event
 					var evt nostr.Event
-					if err := json.Unmarshal(request[2], &evt); err != nil {
+					if err := json.Unmarshal(request[latestInex], &evt); err != nil {
 						notice = "failed to decode event: " + err.Error()
 						return
 					}
