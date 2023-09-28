@@ -87,7 +87,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				removeListener(ws)
 			}
 			s.clientsMu.Unlock()
-			s.Log.Infof("diconnected from %s", conn.RemoteAddr().String())
+			s.Log.Infof("disconnected from %s", conn.RemoteAddr().String())
 		}()
 
 		conn.SetReadLimit(maxMessageSize)
@@ -379,6 +379,8 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ticker.Stop()
 			conn.Close()
+			for := range stop {
+			}
 		}()
 
 		for {
