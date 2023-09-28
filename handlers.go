@@ -56,6 +56,8 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(pingPeriod)
 	stop := make(chan struct{})
 
+	s.Log.Infof("connected from %s", conn.RemoteAddr().String())
+
 	// NIP-42 challenge
 	challenge := make([]byte, 8)
 	rand.Read(challenge)
@@ -85,6 +87,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				removeListener(ws)
 			}
 			s.clientsMu.Unlock()
+			s.Log.Infof("disconnected from %s", conn.RemoteAddr().String())
 		}()
 
 		conn.SetReadLimit(maxMessageSize)
@@ -376,6 +379,8 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ticker.Stop()
 			conn.Close()
+			for range stop {
+			}
 		}()
 
 		for {
@@ -387,6 +392,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					s.Log.Errorf("error writing ping: %v; closing websocket", err)
 					return
 				}
+				s.Log.Infof("pinging for %s", conn.RemoteAddr().String())
 			case <-stop:
 				return
 			}
