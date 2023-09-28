@@ -379,7 +379,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ticker.Stop()
 			conn.Close()
-			for := range stop {
+			for range stop {
 			}
 		}()
 
