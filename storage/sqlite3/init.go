@@ -15,8 +15,8 @@ func (b *SQLite3Backend) Init() error {
 		return err
 	}
 
-	// sqlx default is 0 (unlimited), while sqlite3 by default accepts up to 100 connections
-	db.SetMaxOpenConns(80)
+	db.SetMaxOpenConns(b.MaxOpenConns)
+	db.SetMaxIdleConns(b.MaxIdleConns)
 
 	db.Mapper = reflectx.NewMapperFunc("json", sqlx.NameMapper)
 	b.DB = db
