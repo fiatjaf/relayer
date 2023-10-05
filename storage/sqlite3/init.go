@@ -18,9 +18,31 @@ var ddls = []string{
        tags jsonb NOT NULL,
        content text NOT NULL,
        sig text NOT NULL);`,
-	`CREATE INDEX IF NOT EXISTS idx_event_id on event(id)`,
-	`CREATE INDEX IF NOT EXISTS idx_event_kind on event(kind)`,
-	`CREATE INDEX IF NOT EXISTS idx_event_kind_tags on event(kind, tags)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS ididx ON event(id)`,
+	`CREATE INDEX IF NOT EXISTS pubkeyprefix ON event(pubkey)`,
+	`CREATE INDEX IF NOT EXISTS timeidx ON event(created_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS kindidx ON event(kind)`,
+}
+
+func fixup(db *sqlx.DB) {
+	row, err := db.Query(`SELECT id, rowid FROM event GROUP BY id HAVING COUNT(id) > 1`)
+	if err == nil {
+		for row.Next() {
+			var id, rowid string
+			err = row.Scan(&id, &rowid)
+			if err != nil {
+				continue
+			}
+			result, err := db.Exec(`DELETE FROM event WHERE id = ? AND rowid != ?`, id, rowid)
+			if err != nil {
+				continue
+			}
+			num, _ := result.RowsAffected()
+			println(id, rowid, num)
+		}
+		row.Close()
+		println("DONE")
+	}
 }
 
 func (b *SQLite3Backend) Init() error {
@@ -28,6 +50,7 @@ func (b *SQLite3Backend) Init() error {
 	if err != nil {
 		return err
 	}
+	fixup(db)
 
 	db.SetMaxOpenConns(b.MaxOpenConns)
 	db.SetMaxIdleConns(b.MaxIdleConns)
