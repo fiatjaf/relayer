@@ -24,33 +24,11 @@ var ddls = []string{
 	`CREATE INDEX IF NOT EXISTS kindidx ON event(kind)`,
 }
 
-func fixup(db *sqlx.DB) {
-	row, err := db.Query(`SELECT id, rowid FROM event GROUP BY id HAVING COUNT(id) > 1`)
-	if err == nil {
-		for row.Next() {
-			var id, rowid string
-			err = row.Scan(&id, &rowid)
-			if err != nil {
-				continue
-			}
-			result, err := db.Exec(`DELETE FROM event WHERE id = ? AND rowid != ?`, id, rowid)
-			if err != nil {
-				continue
-			}
-			num, _ := result.RowsAffected()
-			println(id, rowid, num)
-		}
-		row.Close()
-		println("DONE")
-	}
-}
-
 func (b *SQLite3Backend) Init() error {
 	db, err := sqlx.Connect("sqlite3", b.DatabaseURL)
 	if err != nil {
 		return err
 	}
-	fixup(db)
 
 	db.SetMaxOpenConns(b.MaxOpenConns)
 	db.SetMaxIdleConns(b.MaxIdleConns)
