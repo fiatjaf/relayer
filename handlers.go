@@ -390,7 +390,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			go s.handleMessage(ctx, ws, message, store)
+			go s.handleMessage(context.TODO(), ws, message, store)
 		}
 	}()
 
