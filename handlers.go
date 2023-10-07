@@ -180,8 +180,15 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 		); err != nil {
 			return "failed to decode filter"
 		}
+	}
 
-		filter := &filters[i]
+	if accepter, ok := s.relay.(ReqAccepter); ok {
+		if !accepter.AcceptReq(ctx, id, filters) {
+			return "REQ fitlers are not accepted"
+		}
+	}
+
+	for _, filter := range filters {
 
 		// prevent kind-4 events from being returned to unauthed users,
 		//   only when authentication is a thing
@@ -206,7 +213,7 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 			}
 		}
 
-		events, err := store.QueryEvents(ctx, filter)
+		events, err := store.QueryEvents(ctx, &filter)
 		if err != nil {
 			s.Log.Errorf("store: %v", err)
 			continue

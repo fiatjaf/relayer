@@ -26,6 +26,14 @@ type Relay interface {
 	Storage(context.Context) Storage
 }
 
+// ReqAccepter is the main interface for implementing a nostr relay.
+type ReqAccepter interface {
+	// AcceptReq is called for every nostr request filters received by the
+	// server. If the returned value is true, the filtres is passed on to
+	// [Storage.QueryEvent].
+	AcceptReq(context.Context, string, nostr.Filters) bool
+}
+
 // Auther is the interface for implementing NIP-42.
 // ServiceURL() returns the URL used to verify the "AUTH" event from clients.
 type Auther interface {
