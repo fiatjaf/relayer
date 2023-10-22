@@ -53,10 +53,11 @@ func challenge(conn *websocket.Conn) *WebSocket {
 
 func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawMessage, store Storage) string {
 	advancedDeleter, _ := store.(AdvancedDeleter)
+	latestInex := len(request) - 1
 
 	// it's a new event
 	var evt nostr.Event
-	if err := json.Unmarshal(request[1], &evt); err != nil {
+	if err := json.Unmarshal(request[latestInex], &evt); err != nil {
 		return "failed to decode event: " + err.Error()
 	}
 
