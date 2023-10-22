@@ -7,7 +7,9 @@ require (
 	github.com/aquasecurity/esquery v0.2.0
 	github.com/cockroachdb/pebble v0.0.0-20220723153705-3fc374e4dc66
 	github.com/elastic/go-elasticsearch/v8 v8.6.0
+	github.com/etcd-io/bbolt v1.3.3
 	github.com/fasthttp/websocket v1.5.3
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gobwas/ws v1.2.0
 	github.com/grokify/html-strip-tags-go v0.0.1
 	github.com/jb55/lnsocket/go v0.0.0-20220725174341-b98b5cd37bb6
