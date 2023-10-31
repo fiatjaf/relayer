@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/fiatjaf/relayer/v2/storage"
+	"github.com/fiatjaf/eventstore"
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -33,7 +33,7 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 
 		if saveErr := store.SaveEvent(ctx, evt); saveErr != nil {
 			switch saveErr {
-			case storage.ErrDupEvent:
+			case eventstore.ErrDupEvent:
 				return true, saveErr.Error()
 			default:
 				errmsg := saveErr.Error()

@@ -22,5 +22,4 @@ echo '["REQ", "asdf", {"search": "steve", "kinds": [0]}]' | websocat -n ws://127
 
 Currently the indexing is very basic:  It will index the `contents` field for all events where kind != 4.
 Some additional mapping and pre-processing could add better support for different content types.
-See comments in `storage/elasticsearch/elasticsearch.go`.
-
+See comments in `github.com/fiatjaf/eventstore/elasticsearch/elasticsearch.go`.

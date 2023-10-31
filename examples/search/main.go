@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/fiatjaf/eventstore"
+	"github.com/fiatjaf/eventstore/elasticsearch"
 	"github.com/fiatjaf/relayer/v2"
-	"github.com/fiatjaf/relayer/v2/storage/elasticsearch"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -19,7 +20,7 @@ func (r *Relay) Name() string {
 	return "SearchRelay"
 }
 
-func (r *Relay) Storage(ctx context.Context) relayer.Storage {
+func (r *Relay) Storage(ctx context.Context) eventstore.Store {
 	return r.storage
 }
 
@@ -47,7 +48,6 @@ func (r *Relay) BeforeSave(evt *nostr.Event) {
 }
 
 func (r *Relay) AfterSave(evt *nostr.Event) {
-
 }
 
 func main() {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/websocket"
+	"github.com/fiatjaf/eventstore"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip11"
 	"github.com/nbd-wtf/go-nostr/nip42"
@@ -51,7 +52,7 @@ func challenge(conn *websocket.Conn) *WebSocket {
 	}
 }
 
-func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawMessage, store Storage) string {
+func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawMessage, store eventstore.Store) string {
 	advancedDeleter, _ := store.(AdvancedDeleter)
 	latestInex := len(request) - 1
 
@@ -434,7 +435,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.relay.(Auther); ok {
 		supportedNIPs = append(supportedNIPs, 42)
 	}
-	if storage, ok := s.relay.(Storage); ok && storage != nil {
+	if storage, ok := s.relay.(eventstore.Storage); ok && storage != nil {
 		if _, ok = storage.(EventCounter); ok {
 			supportedNIPs = append(supportedNIPs, 45)
 		}
