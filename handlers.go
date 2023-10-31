@@ -84,11 +84,38 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 		// event deletion -- nip09
 		for _, tag := range evt.Tags {
 			if len(tag) >= 2 && tag[0] == "e" {
+				// fetch event to be deleted
+				res, err := s.relay.Storage(ctx).QueryEvents(ctx, nostr.Filter{IDs: []string{tag[1]}})
+				if err != nil {
+					reason := "failed to query for target event"
+					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+					return ""
+				}
+
+				var target *nostr.Event
+				exists := false
+				select {
+				case target, exists = <-res:
+				case <-time.After(time.Millisecond * 200):
+				}
+				if !exists {
+					// this will happen if event is not in the database
+					// or when when the query is taking too long, so we just give up
+					continue
+				}
+
+				// check if this can be deleted
+				if target.PubKey != evt.PubKey {
+					reason := "insufficient permissions"
+					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+					return ""
+				}
+
 				if advancedDeleter != nil {
 					advancedDeleter.BeforeDelete(ctx, tag[1], evt.PubKey)
 				}
 
-				if err := store.DeleteEvent(ctx, tag[1], evt.PubKey); err != nil {
+				if err := store.DeleteEvent(ctx, target); err != nil {
 					reason := fmt.Sprintf("error: %s", err.Error())
 					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
 					return ""
@@ -111,7 +138,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 	return ""
 }
 
-func (s *Server) doCount(ctx context.Context, ws *WebSocket, request []json.RawMessage, store Storage) string {
+func (s *Server) doCount(ctx context.Context, ws *WebSocket, request []json.RawMessage, store eventstore.Store) string {
 	counter, ok := store.(EventCounter)
 	if !ok {
 		return "restricted: this relay does not support NIP-45"
@@ -167,7 +194,7 @@ func (s *Server) doCount(ctx context.Context, ws *WebSocket, request []json.RawM
 	return ""
 }
 
-func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMessage, store Storage) string {
+func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMessage, store eventstore.Store) string {
 	var id string
 	json.Unmarshal(request[1], &id)
 	if id == "" {
@@ -215,7 +242,7 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 			}
 		}
 
-		events, err := store.QueryEvents(ctx, &filter)
+		events, err := store.QueryEvents(ctx, filter)
 		if err != nil {
 			s.Log.Errorf("store: %v", err)
 			continue
@@ -244,7 +271,7 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 	return ""
 }
 
-func (s *Server) doClose(ctx context.Context, ws *WebSocket, request []json.RawMessage, store Storage) string {
+func (s *Server) doClose(ctx context.Context, ws *WebSocket, request []json.RawMessage, store eventstore.Store) string {
 	var id string
 	json.Unmarshal(request[1], &id)
 	if id == "" {
@@ -255,7 +282,7 @@ func (s *Server) doClose(ctx context.Context, ws *WebSocket, request []json.RawM
 	return ""
 }
 
-func (s *Server) doAuth(ctx context.Context, ws *WebSocket, request []json.RawMessage, store Storage) string {
+func (s *Server) doAuth(ctx context.Context, ws *WebSocket, request []json.RawMessage, store eventstore.Store) string {
 	if auther, ok := s.relay.(Auther); ok {
 		var evt nostr.Event
 		if err := json.Unmarshal(request[1], &evt); err != nil {
@@ -273,7 +300,7 @@ func (s *Server) doAuth(ctx context.Context, ws *WebSocket, request []json.RawMe
 	return ""
 }
 
-func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byte, store Storage) {
+func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byte, store eventstore.Store) {
 	var notice string
 	defer func() {
 		if notice != "" {
@@ -435,7 +462,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.relay.(Auther); ok {
 		supportedNIPs = append(supportedNIPs, 42)
 	}
-	if storage, ok := s.relay.(eventstore.Storage); ok && storage != nil {
+	if storage, ok := s.relay.(eventstore.Store); ok && storage != nil {
 		if _, ok = storage.(EventCounter); ok {
 			supportedNIPs = append(supportedNIPs, 45)
 		}
