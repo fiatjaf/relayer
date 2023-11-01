@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/fiatjaf/eventstore"
 	"github.com/fiatjaf/relayer/v2"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nbd-wtf/go-nostr"
@@ -90,7 +91,7 @@ func (relay *Relay) AcceptEvent(ctx context.Context, _ *nostr.Event) bool {
 	return false
 }
 
-func (relay *Relay) Storage(ctx context.Context) relayer.Storage {
+func (relay *Relay) Storage(ctx context.Context) eventstore.Store {
 	return store{relay.db}
 }
 
@@ -103,11 +104,11 @@ func (b store) SaveEvent(ctx context.Context, _ *nostr.Event) error {
 	return errors.New("blocked: we don't accept any events")
 }
 
-func (b store) DeleteEvent(ctx context.Context, id string, pubkey string) error {
+func (b store) DeleteEvent(ctx context.Context, target *nostr.Event) error {
 	return errors.New("blocked: we can't delete any events")
 }
 
-func (b store) QueryEvents(ctx context.Context, filter *nostr.Filter) (chan *nostr.Event, error) {
+func (b store) QueryEvents(ctx context.Context, filter nostr.Filter) (chan *nostr.Event, error) {
 	if filter.IDs != nil || len(filter.Tags) > 0 {
 		return nil, nil
 	}

@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/fiatjaf/eventstore"
+	"github.com/fiatjaf/eventstore/postgresql"
 	"github.com/fiatjaf/relayer/v2"
-	"github.com/fiatjaf/relayer/v2/storage/postgresql"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
 	"github.com/nbd-wtf/go-nostr"
@@ -30,7 +31,7 @@ func (r *Relay) Name() string {
 	return "ExpensiveRelay"
 }
 
-func (r *Relay) Storage(ctx context.Context) relayer.Storage {
+func (r *Relay) Storage(ctx context.Context) eventstore.Store {
 	return r.storage
 }
 
