@@ -91,7 +91,7 @@ func parseFeed(url string) (*gofeed.Feed, error) {
 	return feed, nil
 }
 
-func feedToSetMetadata(pubkey string, feed *gofeed.Feed) nostr.Event {
+func feedToProfileMetadata(pubkey string, feed *gofeed.Feed) nostr.Event {
 	metadata := map[string]string{
 		"name":  feed.Title,
 		"about": feed.Description + "\n\n" + feed.Link,
@@ -109,7 +109,7 @@ func feedToSetMetadata(pubkey string, feed *gofeed.Feed) nostr.Event {
 	evt := nostr.Event{
 		PubKey:    pubkey,
 		CreatedAt: nostr.Timestamp(createdAt.Unix()),
-		Kind:      nostr.KindSetMetadata,
+		Kind:      nostr.KindProfileMetadata,
 		Tags:      nostr.Tags{},
 		Content:   string(content),
 	}
