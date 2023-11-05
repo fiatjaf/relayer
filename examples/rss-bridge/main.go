@@ -100,6 +100,7 @@ type store struct {
 }
 
 func (b store) Init() error { return nil }
+func (b store) Close()      {}
 func (b store) SaveEvent(ctx context.Context, _ *nostr.Event) error {
 	return errors.New("blocked: we don't accept any events")
 }
@@ -131,8 +132,8 @@ func (b store) QueryEvents(ctx context.Context, filter nostr.Filter) (chan *nost
 					continue
 				}
 
-				if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindSetMetadata) {
-					evt := feedToSetMetadata(pubkey, feed)
+				if filter.Kinds == nil || slices.Contains(filter.Kinds, nostr.KindProfileMetadata) {
+					evt := feedToProfileMetadata(pubkey, feed)
 
 					if filter.Since != nil && evt.CreatedAt.Time().Before(filter.Since.Time()) {
 						continue

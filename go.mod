@@ -6,14 +6,14 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/cockroachdb/pebble v0.0.0-20220723153705-3fc374e4dc66
 	github.com/fasthttp/websocket v1.5.3
-	github.com/fiatjaf/eventstore v0.0.1
+	github.com/fiatjaf/eventstore v0.2.0
 	github.com/gobwas/ws v1.2.0
 	github.com/grokify/html-strip-tags-go v0.0.1
 	github.com/jb55/lnsocket/go v0.0.0-20220725174341-b98b5cd37bb6
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/mmcdole/gofeed v1.1.3
-	github.com/nbd-wtf/go-nostr v0.24.2
+	github.com/nbd-wtf/go-nostr v0.25.0
 	github.com/rif/cache2go v1.0.0
 	github.com/rs/cors v1.7.0
 	github.com/stevelacy/daz v0.1.4
