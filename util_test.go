@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/fiatjaf/eventstore"
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -18,14 +19,14 @@ func startTestRelay(t *testing.T, tr *testRelay) *Server {
 
 type testRelay struct {
 	name        string
-	storage     Storage
+	storage     eventstore.Store
 	init        func() error
 	onShutdown  func(context.Context)
 	acceptEvent func(*nostr.Event) bool
 }
 
-func (tr *testRelay) Name() string                    { return tr.name }
-func (tr *testRelay) Storage(context.Context) Storage { return tr.storage }
+func (tr *testRelay) Name() string                             { return tr.name }
+func (tr *testRelay) Storage(context.Context) eventstore.Store { return tr.storage }
 
 func (tr *testRelay) Init() error {
 	if fn := tr.init; fn != nil {
@@ -49,8 +50,9 @@ func (tr *testRelay) AcceptEvent(ctx context.Context, e *nostr.Event) bool {
 
 type testStorage struct {
 	init        func() error
-	queryEvents func(context.Context, *nostr.Filter) (chan *nostr.Event, error)
-	deleteEvent func(ctx context.Context, id string, pubkey string) error
+	close       func()
+	queryEvents func(context.Context, nostr.Filter) (chan *nostr.Event, error)
+	deleteEvent func(context.Context, *nostr.Event) error
 	saveEvent   func(context.Context, *nostr.Event) error
 	countEvents func(context.Context, *nostr.Filter) (int64, error)
 }
@@ -62,16 +64,22 @@ func (st *testStorage) Init() error {
 	return nil
 }
 
-func (st *testStorage) QueryEvents(ctx context.Context, f *nostr.Filter) (chan *nostr.Event, error) {
+func (st *testStorage) Close() {
+	if fn := st.close; fn != nil {
+		fn()
+	}
+}
+
+func (st *testStorage) QueryEvents(ctx context.Context, f nostr.Filter) (chan *nostr.Event, error) {
 	if fn := st.queryEvents; fn != nil {
 		return fn(ctx, f)
 	}
 	return nil, nil
 }
 
-func (st *testStorage) DeleteEvent(ctx context.Context, id string, pubkey string) error {
+func (st *testStorage) DeleteEvent(ctx context.Context, evt *nostr.Event) error {
 	if fn := st.deleteEvent; fn != nil {
-		return fn(ctx, id, pubkey)
+		return fn(ctx, evt)
 	}
 	return nil
 }
