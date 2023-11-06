@@ -71,12 +71,10 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 
 	// check signature (requires the ID to be set)
 	if ok, err := evt.CheckSignature(); err != nil {
-		reason := "error: failed to verify signature"
-		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "error: failed to verify signature"})
 		return ""
 	} else if !ok {
-		reason := "invalid: signature is invalid"
-		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "invalid: signature is invalid"})
 		return ""
 	}
 
@@ -87,8 +85,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 				// fetch event to be deleted
 				res, err := s.relay.Storage(ctx).QueryEvents(ctx, nostr.Filter{IDs: []string{tag[1]}})
 				if err != nil {
-					reason := "failed to query for target event"
-					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "failed to query for target event"})
 					return ""
 				}
 
@@ -106,8 +103,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 
 				// check if this can be deleted
 				if target.PubKey != evt.PubKey {
-					reason := "insufficient permissions"
-					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "insufficient permissions"})
 					return ""
 				}
 
@@ -116,8 +112,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 				}
 
 				if err := store.DeleteEvent(ctx, target); err != nil {
-					reason := fmt.Sprintf("error: %s", err.Error())
-					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+					ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: fmt.Sprintf("error: %s", err.Error())})
 					return ""
 				}
 
@@ -129,11 +124,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 		return ""
 	}
 
-	ok, message := AddEvent(ctx, s.relay, &evt)
-	var reason *string
-	if message != "" {
-		reason = &message
-	}
+	ok, reason := AddEvent(ctx, s.relay, &evt)
 	ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: ok, Reason: reason})
 	return ""
 }
@@ -293,8 +284,7 @@ func (s *Server) doAuth(ctx context.Context, ws *WebSocket, request []json.RawMe
 			ctx = context.WithValue(ctx, AUTH_CONTEXT_KEY, pubkey)
 			ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
 		} else {
-			reason := "error: failed to authenticate"
-			ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
+			ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "error: failed to authenticate"})
 		}
 	}
 	return ""
