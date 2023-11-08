@@ -448,28 +448,29 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	supportedNIPs := []int{9, 11, 12, 15, 16, 20, 33}
-	if _, ok := s.relay.(Auther); ok {
-		supportedNIPs = append(supportedNIPs, 42)
-	}
-	if storage, ok := s.relay.(eventstore.Store); ok && storage != nil {
-		if _, ok = storage.(EventCounter); ok {
-			supportedNIPs = append(supportedNIPs, 45)
-		}
-	}
-
-	info := nip11.RelayInformationDocument{
-		Name:          s.relay.Name(),
-		Description:   "relay powered by the relayer framework",
-		PubKey:        "~",
-		Contact:       "~",
-		SupportedNIPs: supportedNIPs,
-		Software:      "https://github.com/fiatjaf/relayer",
-		Version:       "~",
-	}
-
+	var info nip11.RelayInformationDocument
 	if ifmer, ok := s.relay.(Informationer); ok {
 		info = ifmer.GetNIP11InformationDocument()
+	} else {
+		supportedNIPs := []int{9, 11, 12, 15, 16, 20, 33}
+		if _, ok := s.relay.(Auther); ok {
+			supportedNIPs = append(supportedNIPs, 42)
+		}
+		if storage, ok := s.relay.(eventstore.Store); ok && storage != nil {
+			if _, ok = storage.(EventCounter); ok {
+				supportedNIPs = append(supportedNIPs, 45)
+			}
+		}
+
+		info = nip11.RelayInformationDocument{
+			Name:          s.relay.Name(),
+			Description:   "relay powered by the relayer framework",
+			PubKey:        "~",
+			Contact:       "~",
+			SupportedNIPs: supportedNIPs,
+			Software:      "https://github.com/fiatjaf/relayer",
+			Version:       "~",
+		}
 	}
 
 	json.NewEncoder(w).Encode(info)
