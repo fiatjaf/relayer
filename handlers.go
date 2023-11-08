@@ -89,12 +89,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 					return ""
 				}
 
-				var target *nostr.Event
-				exists := false
-				select {
-				case target, exists = <-res:
-				case <-time.After(time.Millisecond * 200):
-				}
+				target, exists := <-res
 				if !exists {
 					// this will happen if event is not in the database
 					// or when when the query is taking too long, so we just give up
