@@ -95,6 +95,8 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 				case target, exists = <-res:
 				case <-time.After(time.Millisecond * 200):
 				}
+				for range res {
+				}
 				if !exists {
 					// this will happen if event is not in the database
 					// or when when the query is taking too long, so we just give up
