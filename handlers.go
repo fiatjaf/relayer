@@ -203,7 +203,7 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 	}
 
 	if accepter, ok := s.relay.(ReqAccepter); ok {
-		if !accepter.AcceptReq(ctx, id, filters) {
+		if !accepter.AcceptReq(ctx, id, filters, ws.authed) {
 			return "REQ filters are not accepted"
 		}
 	}
