@@ -32,7 +32,7 @@ type ReqAccepter interface {
 	// AcceptReq is called for every nostr request filters received by the
 	// server. If the returned value is true, the filtres is passed on to
 	// [Storage.QueryEvent].
-	AcceptReq(context.Context, string, nostr.Filters) bool
+	AcceptReq(ctx context.Context, id string, filters nostr.Filters, authedPubkey string) bool
 }
 
 // Auther is the interface for implementing NIP-42.
