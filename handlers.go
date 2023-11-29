@@ -64,8 +64,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 
 	// check id
 	hash := sha256.Sum256(evt.Serialize())
-	id := hex.EncodeToString(hash[:])
-	if id != evt.ID {
+	if id := hex.EncodeToString(hash[:]); id != evt.ID {
 		reason := "invalid: event id is computed incorrectly"
 		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: &reason})
 		return ""
