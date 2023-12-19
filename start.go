@@ -69,8 +69,10 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 		options:  options,
 	}
 
-	if err := relay.Storage(context.Background()).Init(); err != nil {
-		return nil, fmt.Errorf("storage init: %w", err)
+	if storage := relay.Storage(context.Background()); storage != nil {
+		if err := storage.Init(); err != nil {
+			return nil, fmt.Errorf("storage init: %w", err)
+		}
 	}
 
 	// init the relay
