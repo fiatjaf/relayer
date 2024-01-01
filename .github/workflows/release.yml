@@ -37,7 +37,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
-          goversion: "1.18"
+          goversion: "1.21"
           project_path: ${{ matrix.project }}
           binary_name: "relayer-${{ matrix.project }}-${{ matrix.goos }}-${{ matrix.goarch }}"
           overwrite: true
