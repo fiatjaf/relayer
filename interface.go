@@ -85,5 +85,5 @@ type AdvancedSaver interface {
 }
 
 type EventCounter interface {
-	CountEvents(ctx context.Context, filter *nostr.Filter) (int64, error)
+	CountEvents(ctx context.Context, filter nostr.Filter) (int64, error)
 }
