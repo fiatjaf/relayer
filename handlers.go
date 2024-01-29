@@ -149,7 +149,7 @@ func (s *Server) doCount(ctx context.Context, ws *WebSocket, request []json.RawM
 			return "failed to decode filter"
 		}
 
-		filter := &filters[i]
+		filter := filters[i]
 
 		// prevent kind-4 events from being returned to unauthed users,
 		//   only when authentication is a thing
