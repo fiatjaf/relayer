@@ -157,11 +157,18 @@ func (s *Server) Shutdown(ctx context.Context) {
 type Option func(*Options)
 
 type Options struct {
+	authDeadline         *time.Duration
 	perConnectionLimiter *rate.Limiter
 }
 
 func DefaultOptions() *Options {
 	return &Options{}
+}
+
+func WithAuthDeadline(deadline time.Duration) Option {
+	return func(o *Options) {
+		o.authDeadline = &deadline
+	}
 }
 
 func WithPerConnectionLimiter(rps rate.Limit, burst int) Option {
