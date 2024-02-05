@@ -430,6 +430,20 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 
+		authDeadline := make(chan any, 1)
+		go func() {
+			if s.options.authDeadline == nil {
+				return
+			}
+			if _, ok := s.relay.(Auther); !ok {
+				return
+			}
+
+			<-time.After(*s.options.authDeadline)
+			authDeadline <- struct{}{}
+			close(authDeadline)
+		}()
+
 		for {
 			select {
 			case <-ticker.C:
@@ -439,6 +453,11 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				s.Log.Infof("pinging for %s", conn.RemoteAddr().String())
+			case <-authDeadline:
+				if ws.authed == "" {
+					s.Log.Errorf("authDeadline elapsed: %v; closing websocket", conn.RemoteAddr().String())
+					return
+				}
 			case <-stop:
 				return
 			}
