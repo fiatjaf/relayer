@@ -423,14 +423,16 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	// writer
 	go func() {
+		authDeadline := make(chan any, 1)
+
 		defer func() {
 			ticker.Stop()
 			conn.Close()
+			close(authDeadline)
 			for range stop {
 			}
 		}()
 
-		authDeadline := make(chan any, 1)
 		go func() {
 			if s.options.authDeadline == nil {
 				return
@@ -441,7 +443,6 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 			<-time.After(*s.options.authDeadline)
 			authDeadline <- struct{}{}
-			close(authDeadline)
 		}()
 
 		for {
