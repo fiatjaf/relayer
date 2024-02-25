@@ -349,7 +349,9 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	stop := make(chan struct{})
 
 	ip := conn.RemoteAddr().String()
-	if realIP := r.Header.Get("X-Real-Ip"); realIP != "" {
+	if realIP := r.Header.Get("X-Forwarded-For"); realIP != "" {
+		ip = realIP // possible to be multiple comma separated
+	} else if realIP := r.Header.Get("X-Real-Ip"); realIP != "" {
 		ip = realIP
 	}
 	s.Log.Infof("connected from %s", ip)
