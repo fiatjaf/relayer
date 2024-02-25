@@ -348,7 +348,11 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(pingPeriod)
 	stop := make(chan struct{})
 
-	s.Log.Infof("connected from %s", conn.RemoteAddr().String())
+	ip := conn.RemoteAddr().String()
+	if realIP := r.Header.Get("X-Real-Ip"); realIP != "" {
+		ip = realIP
+	}
+	s.Log.Infof("connected from %s", ip)
 
 	ws := challenge(conn)
 
@@ -372,7 +376,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				removeListener(ws)
 			}
 			s.clientsMu.Unlock()
-			s.Log.Infof("disconnected from %s", conn.RemoteAddr().String())
+			s.Log.Infof("disconnected from %s", ip)
 
 			ctx.Done()
 		}()
@@ -438,7 +442,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					s.Log.Errorf("error writing ping: %v; closing websocket", err)
 					return
 				}
-				s.Log.Infof("pinging for %s", conn.RemoteAddr().String())
+				s.Log.Infof("pinging for %s", ip)
 			case <-stop:
 				return
 			}
