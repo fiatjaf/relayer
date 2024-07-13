@@ -246,6 +246,9 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 		}
 		i := 0
 		for event := range events {
+			if s.options.skipEventFunc != nil && s.options.skipEventFunc(event) {
+				continue
+			}
 			ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
 			i++
 			if i > filter.Limit {

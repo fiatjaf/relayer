@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fasthttp/websocket"
+	"github.com/nbd-wtf/go-nostr"
 	"github.com/rs/cors"
 	"golang.org/x/time/rate"
 )
@@ -158,6 +159,7 @@ type Option func(*Options)
 
 type Options struct {
 	perConnectionLimiter *rate.Limiter
+	skipEventFunc        func(*nostr.Event) bool
 }
 
 func DefaultOptions() *Options {
@@ -167,6 +169,12 @@ func DefaultOptions() *Options {
 func WithPerConnectionLimiter(rps rate.Limit, burst int) Option {
 	return func(o *Options) {
 		o.perConnectionLimiter = rate.NewLimiter(rps, burst)
+	}
+}
+
+func WithSkipEventFunc(skipEventFunc func(*nostr.Event) bool) Option {
+	return func(o *Options) {
+		o.skipEventFunc = skipEventFunc
 	}
 }
 
