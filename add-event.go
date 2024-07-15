@@ -18,6 +18,9 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 	}
 
 	store := relay.Storage(ctx)
+	wrapper := &eventstore.RelayWrapper{
+		Store: store,
+	}
 	advancedSaver, _ := store.(AdvancedSaver)
 
 	if !relay.AcceptEvent(ctx, evt) {
@@ -31,7 +34,7 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 			advancedSaver.BeforeSave(ctx, evt)
 		}
 
-		if saveErr := store.SaveEvent(ctx, evt); saveErr != nil {
+		if saveErr := wrapper.Publish(ctx, *evt); saveErr != nil {
 			switch saveErr {
 			case eventstore.ErrDupEvent:
 				return true, saveErr.Error()
