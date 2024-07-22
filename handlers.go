@@ -83,6 +83,9 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 		// event deletion -- nip09
 		for _, tag := range evt.Tags {
 			if len(tag) >= 2 && tag[0] == "e" {
+				ctx, cancel := context.WithTimeout(ctx, time.Millisecond*200)
+				defer cancel()
+
 				// fetch event to be deleted
 				res, err := s.relay.Storage(ctx).QueryEvents(ctx, nostr.Filter{IDs: []string{tag[1]}})
 				if err != nil {
@@ -94,7 +97,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 				exists := false
 				select {
 				case target, exists = <-res:
-				case <-time.After(time.Millisecond * 200):
+				case <-ctx.Done():
 				}
 				if !exists {
 					// this will happen if event is not in the database
