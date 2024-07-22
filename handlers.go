@@ -343,9 +343,6 @@ func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byt
 }
 
 func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	store := s.relay.Storage(ctx)
-
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		s.Log.Errorf("failed to upgrade websocket: %v", err)
@@ -374,6 +371,8 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+
+	store := s.relay.Storage(ctx)
 
 	// reader
 	go func() {
