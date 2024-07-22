@@ -76,6 +76,7 @@ func removeListenerId(ws *WebSocket, id string) {
 func removeListener(ws *WebSocket) {
 	listenersMutex.Lock()
 	defer listenersMutex.Unlock()
+	clear(listeners[ws])
 	delete(listeners, ws)
 }
 
