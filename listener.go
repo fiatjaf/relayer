@@ -1,8 +1,6 @@
 package relayer
 
 import (
-	"sync"
-
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -10,19 +8,14 @@ type Listener struct {
 	filters nostr.Filters
 }
 
-var (
-	listeners      = make(map[*WebSocket]map[string]*Listener)
-	listenersMutex = sync.Mutex{}
-)
+func (s *Server) GetListeningFilters() nostr.Filters {
+	respfilters := make(nostr.Filters, 0, len(s.listeners)*2)
 
-func GetListeningFilters() nostr.Filters {
-	respfilters := make(nostr.Filters, 0, len(listeners)*2)
-
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
+	s.listenersMutex.Lock()
+	defer s.listenersMutex.Unlock()
 
 	// here we go through all the existing listeners
-	for _, connlisteners := range listeners {
+	for _, connlisteners := range s.listeners {
 		for _, listener := range connlisteners {
 			for _, listenerfilter := range listener.filters {
 				for _, respfilter := range respfilters {
@@ -46,45 +39,45 @@ func GetListeningFilters() nostr.Filters {
 	return respfilters
 }
 
-func setListener(id string, ws *WebSocket, filters nostr.Filters) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
+func (s *Server) setListener(id string, ws *WebSocket, filters nostr.Filters) {
+	s.listenersMutex.Lock()
+	defer s.listenersMutex.Unlock()
 
-	subs, ok := listeners[ws]
+	subs, ok := s.listeners[ws]
 	if !ok {
 		subs = make(map[string]*Listener)
-		listeners[ws] = subs
+		s.listeners[ws] = subs
 	}
 
 	subs[id] = &Listener{filters: filters}
 }
 
 // Remove a specific subscription id from listeners for a given ws client
-func removeListenerId(ws *WebSocket, id string) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
+func (s *Server) removeListenerId(ws *WebSocket, id string) {
+	s.listenersMutex.Lock()
+	defer s.listenersMutex.Unlock()
 
-	if subs, ok := listeners[ws]; ok {
-		delete(listeners[ws], id)
+	if subs, ok := s.listeners[ws]; ok {
+		delete(s.listeners[ws], id)
 		if len(subs) == 0 {
-			delete(listeners, ws)
+			delete(s.listeners, ws)
 		}
 	}
 }
 
 // Remove WebSocket conn from listeners
-func removeListener(ws *WebSocket) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
-	clear(listeners[ws])
-	delete(listeners, ws)
+func (s *Server) removeListener(ws *WebSocket) {
+	s.listenersMutex.Lock()
+	defer s.listenersMutex.Unlock()
+	clear(s.listeners[ws])
+	delete(s.listeners, ws)
 }
 
-func notifyListeners(event *nostr.Event) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
+func (s *Server) notifyListeners(event *nostr.Event) {
+	s.listenersMutex.Lock()
+	defer s.listenersMutex.Unlock()
 
-	for ws, subs := range listeners {
+	for ws, subs := range s.listeners {
 		for id, listener := range subs {
 			if !listener.filters.Match(event) {
 				continue
