@@ -126,12 +126,12 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 			}
 		}
 
-		s.notifyListeners(&evt)
+		notifyListeners(s.relay, &evt)
 		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
 		return ""
 	}
 
-	ok, reason := s.AddEvent(ctx, &evt)
+	ok, reason := AddEvent(ctx, s.relay, &evt)
 	ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: ok, Reason: reason})
 	return ""
 }
@@ -268,7 +268,7 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 	}
 
 	ws.WriteJSON(nostr.EOSEEnvelope(id))
-	s.setListener(id, ws, filters)
+	setListener(s.relay, id, ws, filters)
 	return ""
 }
 
@@ -279,7 +279,7 @@ func (s *Server) doClose(ctx context.Context, ws *WebSocket, request []json.RawM
 		return "CLOSE has no <id>"
 	}
 
-	s.removeListenerId(ws, id)
+	removeListenerId(s.relay, ws, id)
 	return ""
 }
 
@@ -383,7 +383,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			if _, ok := s.clients[conn]; ok {
 				conn.Close()
 				delete(s.clients, conn)
-				s.removeListener(ws)
+				removeListener(s.relay, ws)
 			}
 			s.clientsMu.Unlock()
 			s.Log.Infof("disconnected from %s", ip)

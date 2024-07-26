@@ -48,9 +48,6 @@ type Server struct {
 	Addr       string
 	serveMux   *http.ServeMux
 	httpServer *http.Server
-
-	listeners      map[*WebSocket]map[string]*Listener
-	listenersMutex sync.Mutex
 }
 
 func (s *Server) Router() *http.ServeMux {
@@ -66,12 +63,11 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 	}
 
 	srv := &Server{
-		Log:       defaultLogger(relay.Name() + ": "),
-		relay:     relay,
-		clients:   make(map[*websocket.Conn]struct{}),
-		serveMux:  &http.ServeMux{},
-		options:   options,
-		listeners: make(map[*WebSocket]map[string]*Listener),
+		Log:      defaultLogger(relay.Name() + ": "),
+		relay:    relay,
+		clients:  make(map[*websocket.Conn]struct{}),
+		serveMux: &http.ServeMux{},
+		options:  options,
 	}
 
 	if storage := relay.Storage(context.Background()); storage != nil {
@@ -89,7 +85,7 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 	if inj, ok := relay.(Injector); ok {
 		go func() {
 			for event := range inj.InjectEvents() {
-				srv.notifyListeners(&event)
+				notifyListeners(srv.relay, &event)
 			}
 		}()
 	}

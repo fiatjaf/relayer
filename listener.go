@@ -8,14 +8,14 @@ type Listener struct {
 	filters nostr.Filters
 }
 
-func (s *Server) GetListeningFilters() nostr.Filters {
-	respfilters := make(nostr.Filters, 0, len(s.listeners)*2)
+func (rl *Listeners) GetListeningFilters() nostr.Filters {
+	respfilters := make(nostr.Filters, 0, len(rl.listeners)*2)
 
-	s.listenersMutex.Lock()
-	defer s.listenersMutex.Unlock()
+	rl.listenersMutex.Lock()
+	defer rl.listenersMutex.Unlock()
 
 	// here we go through all the existing listeners
-	for _, connlisteners := range s.listeners {
+	for _, connlisteners := range rl.listeners {
 		for _, listener := range connlisteners {
 			for _, listenerfilter := range listener.filters {
 				for _, respfilter := range respfilters {
@@ -39,45 +39,77 @@ func (s *Server) GetListeningFilters() nostr.Filters {
 	return respfilters
 }
 
-func (s *Server) setListener(id string, ws *WebSocket, filters nostr.Filters) {
-	s.listenersMutex.Lock()
-	defer s.listenersMutex.Unlock()
+func setListener(relay Relay, id string, ws *WebSocket, filters nostr.Filters) {
+	if b, ok := relay.(RelayListener); ok {
+		if rl := b.Listeners(); rl != nil {
+			rl.setListener(id, ws, filters)
+		}
+	}
+}
 
-	subs, ok := s.listeners[ws]
+func (rl *Listeners) setListener(id string, ws *WebSocket, filters nostr.Filters) {
+	rl.listenersMutex.Lock()
+	defer rl.listenersMutex.Unlock()
+
+	subs, ok := rl.listeners[ws]
 	if !ok {
 		subs = make(map[string]*Listener)
-		s.listeners[ws] = subs
+		rl.listeners[ws] = subs
 	}
 
 	subs[id] = &Listener{filters: filters}
 }
 
-// Remove a specific subscription id from listeners for a given ws client
-func (s *Server) removeListenerId(ws *WebSocket, id string) {
-	s.listenersMutex.Lock()
-	defer s.listenersMutex.Unlock()
+func removeListenerId(relay Relay, ws *WebSocket, id string) {
+	if b, ok := relay.(RelayListener); ok {
+		if rl := b.Listeners(); rl != nil {
+			rl.removeListenerId(ws, id)
+		}
+	}
+}
 
-	if subs, ok := s.listeners[ws]; ok {
-		delete(s.listeners[ws], id)
+// Remove a specific subscription id from listeners for a given ws client
+func (rl *Listeners) removeListenerId(ws *WebSocket, id string) {
+	rl.listenersMutex.Lock()
+	defer rl.listenersMutex.Unlock()
+
+	if subs, ok := rl.listeners[ws]; ok {
+		delete(rl.listeners[ws], id)
 		if len(subs) == 0 {
-			delete(s.listeners, ws)
+			delete(rl.listeners, ws)
+		}
+	}
+}
+
+func removeListener(relay Relay, ws *WebSocket) {
+	if b, ok := relay.(RelayListener); ok {
+		if rl := b.Listeners(); rl != nil {
+			rl.removeListener(ws)
 		}
 	}
 }
 
 // Remove WebSocket conn from listeners
-func (s *Server) removeListener(ws *WebSocket) {
-	s.listenersMutex.Lock()
-	defer s.listenersMutex.Unlock()
-	clear(s.listeners[ws])
-	delete(s.listeners, ws)
+func (rl *Listeners) removeListener(ws *WebSocket) {
+	rl.listenersMutex.Lock()
+	defer rl.listenersMutex.Unlock()
+	clear(rl.listeners[ws])
+	delete(rl.listeners, ws)
 }
 
-func (s *Server) notifyListeners(event *nostr.Event) {
-	s.listenersMutex.Lock()
-	defer s.listenersMutex.Unlock()
+func notifyListeners(relay Relay, event *nostr.Event) {
+	if b, ok := relay.(RelayListener); ok {
+		if rl := b.Listeners(); rl != nil {
+			rl.notifyListeners(event)
+		}
+	}
+}
 
-	for ws, subs := range s.listeners {
+func (rl *Listeners) notifyListeners(event *nostr.Event) {
+	rl.listenersMutex.Lock()
+	defer rl.listenersMutex.Unlock()
+
+	for ws, subs := range rl.listeners {
 		for id, listener := range subs {
 			if !listener.filters.Match(event) {
 				continue

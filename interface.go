@@ -3,6 +3,7 @@ package relayer
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"github.com/fiatjaf/eventstore"
 	"github.com/nbd-wtf/go-nostr"
@@ -25,6 +26,21 @@ type Relay interface {
 	AcceptEvent(context.Context, *nostr.Event) bool
 	// Storage returns the relay storage implementation.
 	Storage(context.Context) eventstore.Store
+}
+
+func NewListeners() *Listeners {
+	return &Listeners{
+		listeners: make(map[*WebSocket]map[string]*Listener),
+	}
+}
+
+type Listeners struct {
+	listeners      map[*WebSocket]map[string]*Listener
+	listenersMutex sync.Mutex
+}
+
+type RelayListener interface {
+	Listeners() *Listeners
 }
 
 // ReqAccepter is the main interface for implementing a nostr relay.

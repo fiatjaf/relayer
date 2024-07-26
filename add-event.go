@@ -12,18 +12,18 @@ import (
 var nip20prefixmatcher = regexp.MustCompile(`^\w+: `)
 
 // AddEvent has a business rule to add an event to the relayer
-func (s *Server) AddEvent(ctx context.Context, evt *nostr.Event) (accepted bool, message string) {
+func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool, message string) {
 	if evt == nil {
 		return false, ""
 	}
 
-	store := s.relay.Storage(ctx)
+	store := relay.Storage(ctx)
 	wrapper := &eventstore.RelayWrapper{
 		Store: store,
 	}
 	advancedSaver, _ := store.(AdvancedSaver)
 
-	if !s.relay.AcceptEvent(ctx, evt) {
+	if !relay.AcceptEvent(ctx, evt) {
 		return false, "blocked: event blocked by relay"
 	}
 
@@ -53,7 +53,11 @@ func (s *Server) AddEvent(ctx context.Context, evt *nostr.Event) (accepted bool,
 		}
 	}
 
-	s.notifyListeners(evt)
+	if b, ok := relay.(RelayListener); ok {
+		if rl := b.Listeners(); rl != nil {
+			rl.notifyListeners(evt)
+		}
+	}
 
 	return true, ""
 }
