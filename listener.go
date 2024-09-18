@@ -78,6 +78,9 @@ func removeListener(ws *WebSocket) {
 	defer listenersMutex.Unlock()
 	clear(listeners[ws])
 	delete(listeners, ws)
+	if len(listeners) == 0 {
+		listeners = make(map[*WebSocket]map[string]*Listener)
+	}
 }
 
 func notifyListeners(event *nostr.Event) {
