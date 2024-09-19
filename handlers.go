@@ -379,13 +379,8 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			cancel()
 			ticker.Stop()
-			s.clientsMu.Lock()
-			if _, ok := s.clients[conn]; ok {
-				conn.Close()
-				delete(s.clients, conn)
-				removeListener(ws)
-			}
-			s.clientsMu.Unlock()
+			s.deleteClient(conn)
+			removeListener(ws)
 			s.Log.Infof("disconnected from %s", ip)
 		}()
 

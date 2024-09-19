@@ -134,6 +134,18 @@ func (s *Server) Start(host string, port int, started ...chan bool) error {
 	}
 }
 
+func (s *Server) deleteClient(conn *websocket.Conn) {
+	s.clientsMu.Lock()
+	if _, ok := s.clients[conn]; ok {
+		conn.Close()
+		delete(s.clients, conn)
+		if len(s.clients) == 0 {
+			s.clients = make(map[*websocket.Conn]struct{})
+		}
+	}
+	s.clientsMu.Unlock()
+}
+
 // Shutdown sends a websocket close control message to all connected clients.
 //
 // If the relay is ShutdownAware, Shutdown calls its OnShutdown, passing the context as is.
