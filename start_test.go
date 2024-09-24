@@ -3,15 +3,19 @@ package relayer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/fiatjaf/eventstore/slicestore"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/nbd-wtf/go-nostr"
+	"go.uber.org/goleak"
 )
 
 func TestServerStartShutdown(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	var (
 		inited      bool
 		storeInited bool
@@ -29,6 +33,7 @@ func TestServerStartShutdown(t *testing.T) {
 		},
 	}
 	srv, _ := NewServer(rl)
+	defer srv.Shutdown(context.TODO())
 	ready := make(chan bool)
 	done := make(chan error)
 	go func() { done <- srv.Start("127.0.0.1", 0, ready); close(done) }()
@@ -43,8 +48,10 @@ func TestServerStartShutdown(t *testing.T) {
 	}
 
 	// check that http requests are served
-	if _, err := http.Get("http://" + srv.Addr); err != nil {
+	if resp, err := http.Get("http://" + srv.Addr); err != nil {
 		t.Errorf("GET %s: %v", srv.Addr, err)
+	} else {
+		resp.Body.Close()
 	}
 
 	// verify server shuts down
@@ -65,8 +72,10 @@ func TestServerStartShutdown(t *testing.T) {
 }
 
 func TestServerShutdownWebsocket(t *testing.T) {
+	defer goleak.VerifyNone(t)
 	// set up a new relay server
-	srv := startTestRelay(t, &testRelay{storage: &testStorage{}})
+	srv := startTestRelay(t, &testRelay{storage: &slicestore.SliceStore{}})
+	defer srv.Shutdown(context.TODO())
 
 	// connect a client to it
 	ctx1, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -75,6 +84,23 @@ func TestServerShutdownWebsocket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nostr.RelayConnectContext: %v", err)
 	}
+
+	sk := nostr.GeneratePrivateKey()
+
+	var ev nostr.Event
+	ev.Kind = nostr.KindTextNote
+	ev.Content = "test"
+	ev.CreatedAt = nostr.Now()
+	ev.Sign(sk)
+	client.Publish(ctx1, ev)
+
+	var filter nostr.Filter
+	filter.Kinds = []int{nostr.KindTextNote}
+	evs, err := client.QuerySync(ctx1, filter)
+	if err != nil {
+		t.Fatalf("client.QuerySync: %v", err)
+	}
+	fmt.Println(evs)
 
 	// now, shut down the server
 	ctx2, cancel := context.WithTimeout(context.Background(), 2*time.Second)
