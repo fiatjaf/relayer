@@ -251,19 +251,21 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 			filter.Limit = 9999999999
 		}
 		i := 0
-		for event := range events {
-			if s.options.skipEventFunc != nil && s.options.skipEventFunc(event) {
-				continue
+		if events != nil {
+			for event := range events {
+				if s.options.skipEventFunc != nil && s.options.skipEventFunc(event) {
+					continue
+				}
+				ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
+				i++
+				if i > filter.Limit {
+					break
+				}
 			}
-			ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
-			i++
-			if i > filter.Limit {
-				break
-			}
-		}
 
-		// exhaust the channel (in case we broke out of it early) so it is closed by the storage
-		for range events {
+			// exhaust the channel (in case we broke out of it early) so it is closed by the storage
+			for range events {
+			}
 		}
 	}
 
