@@ -466,7 +466,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if ifmer, ok := s.relay.(Informationer); ok {
 		info = ifmer.GetNIP11InformationDocument()
 	} else {
-		supportedNIPs := []int{9, 11, 12, 15, 16, 20, 33}
+		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33}
 		if _, ok := s.relay.(Auther); ok {
 			supportedNIPs = append(supportedNIPs, 42)
 		}
