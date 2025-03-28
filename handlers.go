@@ -293,7 +293,6 @@ func (s *Server) doAuth(ctx context.Context, ws *WebSocket, request []json.RawMe
 		}
 		if pubkey, ok := nip42.ValidateAuthEvent(&evt, ws.challenge, auther.ServiceURL()); ok {
 			ws.authed = pubkey
-			ctx = context.WithValue(ctx, AUTH_CONTEXT_KEY, pubkey)
 			ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
 		} else {
 			ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "error: failed to authenticate"})
@@ -323,6 +322,8 @@ func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byt
 
 	var typ string
 	json.Unmarshal(request[0], &typ)
+
+	ctx = context.WithValue(ctx, AUTH_CONTEXT_KEY, ws)
 
 	switch typ {
 	case "EVENT":
