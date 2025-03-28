@@ -22,7 +22,7 @@ type Relay interface {
 	// If the returned value is true, the event is passed on to [Storage.SaveEvent].
 	// Otherwise, the server responds with a negative and "blocked" message as described
 	// in NIP-20.
-	AcceptEvent(context.Context, *nostr.Event) bool
+	AcceptEvent(context.Context, *nostr.Event) (bool, string)
 	// Storage returns the relay storage implementation.
 	Storage(context.Context) eventstore.Store
 }
