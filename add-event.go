@@ -23,8 +23,11 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 	}
 	advancedSaver, _ := store.(AdvancedSaver)
 
-	if !relay.AcceptEvent(ctx, evt) {
-		return false, "blocked: event blocked by relay"
+	if ok, msg := relay.AcceptEvent(ctx, evt); !ok {
+		if msg == "" {
+			msg = "blocked: event blocked by relay"
+		}
+		return false, msg
 	}
 
 	if 20000 <= evt.Kind && evt.Kind < 30000 {
