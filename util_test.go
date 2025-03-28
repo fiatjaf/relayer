@@ -22,7 +22,7 @@ type testRelay struct {
 	storage     eventstore.Store
 	init        func() error
 	onShutdown  func(context.Context)
-	acceptEvent func(*nostr.Event) bool
+	acceptEvent func(*nostr.Event) (bool, string)
 }
 
 func (tr *testRelay) Name() string                             { return tr.name }
@@ -41,20 +41,21 @@ func (tr *testRelay) OnShutdown(ctx context.Context) {
 	}
 }
 
-func (tr *testRelay) AcceptEvent(ctx context.Context, e *nostr.Event) bool {
+func (tr *testRelay) AcceptEvent(ctx context.Context, e *nostr.Event) (bool, string) {
 	if fn := tr.acceptEvent; fn != nil {
 		return fn(e)
 	}
-	return true
+	return true, ""
 }
 
 type testStorage struct {
-	init        func() error
-	close       func()
-	queryEvents func(context.Context, nostr.Filter) (chan *nostr.Event, error)
-	deleteEvent func(context.Context, *nostr.Event) error
-	saveEvent   func(context.Context, *nostr.Event) error
-	countEvents func(context.Context, *nostr.Filter) (int64, error)
+	init         func() error
+	close        func()
+	queryEvents  func(context.Context, nostr.Filter) (chan *nostr.Event, error)
+	deleteEvent  func(context.Context, *nostr.Event) error
+	saveEvent    func(context.Context, *nostr.Event) error
+	countEvents  func(context.Context, *nostr.Filter) (int64, error)
+	replaceEvent func(context.Context, *nostr.Event) error
 }
 
 func (st *testStorage) Init() error {
@@ -96,4 +97,11 @@ func (st *testStorage) CountEvents(ctx context.Context, f *nostr.Filter) (int64,
 		return fn(ctx, f)
 	}
 	return 0, nil
+}
+
+func (st *testStorage) ReplaceEvent(ctx context.Context, e *nostr.Event) error {
+	if fn := st.replaceEvent; fn != nil {
+		return fn(ctx, e)
+	}
+	return nil
 }
