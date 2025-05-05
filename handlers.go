@@ -409,6 +409,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(
 					err,
+					websocket.CloseNormalClosure,    // 1000
 					websocket.CloseGoingAway,        // 1001
 					websocket.CloseNoStatusReceived, // 1005
 					websocket.CloseAbnormalClosure,  // 1006
