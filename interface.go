@@ -41,6 +41,12 @@ type Auther interface {
 	ServiceURL() string
 }
 
+// CustomAuther extends Auther with custom authentication logic
+type CustomAuther interface {
+	Auther
+	Authenticate(ctx context.Context, evt *nostr.Event) (bool, string)
+}
+
 type Injector interface {
 	InjectEvents() chan nostr.Event
 }
