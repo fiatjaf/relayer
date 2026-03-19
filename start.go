@@ -48,6 +48,9 @@ type Server struct {
 	Addr       string
 	serveMux   *http.ServeMux
 	httpServer *http.Server
+
+	// shutdown signal for background goroutines
+	done chan struct{}
 }
 
 func (s *Server) Router() *http.ServeMux {
@@ -68,6 +71,7 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 		clients:  make(map[*websocket.Conn]struct{}),
 		serveMux: &http.ServeMux{},
 		options:  options,
+		done:     make(chan struct{}),
 	}
 
 	if storage := relay.Storage(context.Background()); storage != nil {
@@ -84,8 +88,17 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 	// start listening from events from other sources, if any
 	if inj, ok := relay.(Injector); ok {
 		go func() {
-			for event := range inj.InjectEvents() {
-				notifyListeners(&event)
+			ch := inj.InjectEvents()
+			for {
+				select {
+				case event, ok := <-ch:
+					if !ok {
+						return
+					}
+					notifyListeners(&event)
+				case <-srv.done:
+					return
+				}
 			}
 		}()
 	}
@@ -140,6 +153,8 @@ func (s *Server) Start(host string, port int, started ...chan bool) error {
 // Note that the HTTP server make some time to shutdown and so the context deadline,
 // if any, may have been shortened by the time OnShutdown is called.
 func (s *Server) Shutdown(ctx context.Context) {
+	close(s.done)
+
 	s.httpServer.Shutdown(ctx)
 
 	s.clientsMu.Lock()
