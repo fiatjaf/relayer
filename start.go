@@ -54,6 +54,12 @@ func (s *Server) Router() *http.ServeMux {
 	return s.serveMux
 }
 
+func (s *Server) ClientsNum() int {
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
+	return len(s.clients)
+}
+
 // NewServer initializes the relay and its storage using their respective Init methods,
 // returning any non-nil errors, and returns a Server ready to listen for HTTP requests.
 func NewServer(relay Relay, opts ...Option) (*Server, error) {
