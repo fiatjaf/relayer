@@ -12,14 +12,13 @@ type Listener struct {
 
 var (
 	listeners      = make(map[*WebSocket]map[string]*Listener)
-	listenersMutex = sync.Mutex{}
+	listenersMutex = sync.RWMutex{}
 )
 
 func GetListeningFilters() nostr.Filters {
+	listenersMutex.RLock()
+	defer listenersMutex.RUnlock()
 	respfilters := make(nostr.Filters, 0, len(listeners)*2)
-
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
 
 	// here we go through all the existing listeners
 	for _, connlisteners := range listeners {
@@ -80,16 +79,31 @@ func removeListener(ws *WebSocket) {
 	delete(listeners, ws)
 }
 
-func notifyListeners(event *nostr.Event) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
+type listenerDelivery struct {
+	ws    *WebSocket
+	subID string
+	event nostr.Event
+}
 
+func notifyListeners(event *nostr.Event) {
+	listenersMutex.RLock()
+	deliveries := make([]listenerDelivery, 0, len(listeners))
 	for ws, subs := range listeners {
 		for id, listener := range subs {
 			if !listener.filters.Match(event) {
 				continue
 			}
-			ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
+			deliveries = append(deliveries, listenerDelivery{
+				ws:    ws,
+				subID: id,
+				event: *event,
+			})
 		}
+	}
+	listenersMutex.RUnlock()
+
+	for _, delivery := range deliveries {
+		delivery := delivery
+		delivery.ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &delivery.subID, Event: delivery.event})
 	}
 }

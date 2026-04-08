@@ -183,6 +183,23 @@ func TestAddEvent(t *testing.T) {
 		}
 	})
 
+	t.Run("replace error", func(t *testing.T) {
+		rl := &testRelay{
+			storage: &testStorage{
+				replaceEvent: func(_ context.Context, _ *nostr.Event) error {
+					return errors.New("replace failed")
+				},
+			},
+		}
+		accepted, msg := AddEvent(context.Background(), rl, &nostr.Event{Kind: 30000, Tags: nostr.Tags{{"d", ""}}})
+		if accepted {
+			t.Error("expected rejection")
+		}
+		if !strings.Contains(msg, "replace failed") {
+			t.Errorf("expected error containing 'replace failed', got %q", msg)
+		}
+	})
+
 	t.Run("AdvancedSaver hooks called", func(t *testing.T) {
 		clearListeners()
 		defer clearListeners()
