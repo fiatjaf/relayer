@@ -261,6 +261,27 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 					return ""
 				}
 			}
+
+			// NIP-59: prevent gift wrap events from being returned to non-recipients
+			if slices.Contains(filter.Kinds, nostr.KindGiftWrap) {
+				receivers, _ := filter.Tags["p"]
+				switch {
+				case ws.authed == "":
+					ws.WriteJSON(nostr.ClosedEnvelope{
+						SubscriptionID: id,
+						Reason:         "restricted: this relay does not serve gift-wrapped events to unauthenticated users, does your client implement NIP-42?",
+					})
+					return ""
+				case len(receivers) == 1 && receivers[0] == ws.authed:
+					// allowed: querying gift wraps addressed to self
+				default:
+					ws.WriteJSON(nostr.ClosedEnvelope{
+						SubscriptionID: id,
+						Reason:         "restricted: authenticated user does not have authorization for requested filters.",
+					})
+					return ""
+				}
+			}
 		}
 
 		events, err := store.QueryEvents(ctx, filter)
