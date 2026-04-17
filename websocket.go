@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/fasthttp/websocket"
+	"github.com/nbd-wtf/go-nostr/nip77/negentropy"
 	"golang.org/x/time/rate"
 )
 
@@ -15,6 +16,10 @@ type WebSocket struct {
 	challenge string
 	authed    string
 	limiter   *rate.Limiter
+
+	// nip77
+	negsMu sync.Mutex
+	negs   map[string]*negentropy.Negentropy
 }
 
 func (ws *WebSocket) WriteJSON(any interface{}) error {

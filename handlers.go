@@ -317,6 +317,12 @@ func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byt
 		notice = s.doClose(ctx, ws, request, store)
 	case "AUTH":
 		notice = s.doAuth(ctx, ws, request, store)
+	case "NEG-OPEN":
+		s.doNegOpen(ctx, ws, message, store)
+	case "NEG-MSG":
+		s.doNegMsg(ws, message)
+	case "NEG-CLOSE":
+		s.doNegClose(ws, message)
 	default:
 		if cwh, ok := s.relay.(CustomWebSocketHandler); ok {
 			cwh.HandleUnknownType(ws, typ, request)
@@ -407,6 +413,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				conn.Close()
 				delete(s.clients, conn)
 				s.removeListener(ws)
+				ws.clearNegs()
 			}
 			s.clientsMu.Unlock()
 			s.Log.Infof("disconnected from %s", ip)
@@ -482,7 +489,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if ifmer, ok := s.relay.(Informationer); ok {
 		info = ifmer.GetNIP11InformationDocument()
 	} else {
-		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33}
+		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33, 77}
 		if _, ok := s.relay.(Auther); ok {
 			supportedNIPs = append(supportedNIPs, 42)
 		}
