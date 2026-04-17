@@ -129,6 +129,47 @@ func TestNIP77_ReconcileEmptyClient(t *testing.T) {
 	}
 }
 
+func TestNIP77_ConcurrentReconcile(t *testing.T) {
+	// Fire several NEG-MSG frames back-to-back on the same subscription to
+	// exercise the per-session lock under -race.
+	store := &slicestore.SliceStore{}
+	srv := startTestRelay(t, &testRelay{storage: store})
+	defer srv.Shutdown(context.TODO())
+	seedRelay(t, store, 3)
+
+	conn := dialTestWS(t, srv.Addr)
+
+	vec := vector.New()
+	vec.Seal()
+	neg := negentropy.New(vec, 4096)
+	initial := neg.Start()
+
+	open := nip77.OpenEnvelope{SubscriptionID: "race", Filter: nostr.Filter{Kinds: []int{nostr.KindTextNote}}, Message: initial}
+	b, _ := open.MarshalJSON()
+	if err := conn.WriteMessage(websocket.TextMessage, b); err != nil {
+		t.Fatalf("write open: %v", err)
+	}
+	env := readNegMessage(t, conn)
+	first, ok := env.(*nip77.MessageEnvelope)
+	if !ok {
+		t.Fatalf("unexpected envelope: %s", env.Label())
+	}
+
+	// Writes go out sequentially (fasthttp/websocket forbids concurrent
+	// writes from one client), but each message spawns its own goroutine on
+	// the server side, so their Reconcile calls can overlap.
+	msg := nip77.MessageEnvelope{SubscriptionID: "race", Message: first.Message}
+	mb, _ := msg.MarshalJSON()
+	for i := 0; i < 8; i++ {
+		if err := conn.WriteMessage(websocket.TextMessage, mb); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+	for i := 0; i < 8; i++ {
+		readNegMessage(t, conn)
+	}
+}
+
 func TestNIP77_CloseUnknownSubscription(t *testing.T) {
 	store := &slicestore.SliceStore{}
 	srv := startTestRelay(t, &testRelay{storage: store})

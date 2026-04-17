@@ -6,6 +6,7 @@ package relayer
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/fiatjaf/eventstore"
 	"github.com/nbd-wtf/go-nostr"
@@ -18,7 +19,17 @@ import (
 // further work into subsequent frames when this is reached.
 const negFrameSizeLimit = 4096 * 16
 
-func (ws *WebSocket) getNeg(id string) *negentropy.Negentropy {
+// negSession wraps a Negentropy instance with a mutex. Reconcile mutates
+// internal state (lastTimestamp in/out), so concurrent calls on the same
+// instance would race — a buggy client sending multiple NEG-MSG frames in
+// flight would trigger it since handleMessage dispatches each frame in its
+// own goroutine.
+type negSession struct {
+	mu  sync.Mutex
+	neg *negentropy.Negentropy
+}
+
+func (ws *WebSocket) getNeg(id string) *negSession {
 	ws.negsMu.Lock()
 	defer ws.negsMu.Unlock()
 	if ws.negs == nil {
@@ -27,13 +38,13 @@ func (ws *WebSocket) getNeg(id string) *negentropy.Negentropy {
 	return ws.negs[id]
 }
 
-func (ws *WebSocket) setNeg(id string, n *negentropy.Negentropy) {
+func (ws *WebSocket) setNeg(id string, sess *negSession) {
 	ws.negsMu.Lock()
 	defer ws.negsMu.Unlock()
 	if ws.negs == nil {
-		ws.negs = make(map[string]*negentropy.Negentropy)
+		ws.negs = make(map[string]*negSession)
 	}
-	ws.negs[id] = n
+	ws.negs[id] = sess
 }
 
 func (ws *WebSocket) removeNeg(id string) {
@@ -95,13 +106,15 @@ func (s *Server) doNegOpen(ctx context.Context, ws *WebSocket, message []byte, s
 
 	// Server-side uses Reconcile directly (no Start); Start is for the
 	// initiator, which the client already did before sending NEG-OPEN.
-	neg := negentropy.New(vec, negFrameSizeLimit)
-	output, err := neg.Reconcile(env.Message)
+	sess := &negSession{neg: negentropy.New(vec, negFrameSizeLimit)}
+	sess.mu.Lock()
+	output, err := sess.neg.Reconcile(env.Message)
+	sess.mu.Unlock()
 	if err != nil {
 		ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: "reconcile failed: " + err.Error()})
 		return
 	}
-	ws.setNeg(env.SubscriptionID, neg)
+	ws.setNeg(env.SubscriptionID, sess)
 	ws.WriteJSON(nip77.MessageEnvelope{SubscriptionID: env.SubscriptionID, Message: output})
 }
 
@@ -113,12 +126,14 @@ func (s *Server) doNegMsg(ws *WebSocket, message []byte) {
 		ws.WriteJSON(nip77.ErrorEnvelope{Reason: "failed to decode NEG-MSG: " + err.Error()})
 		return
 	}
-	neg := ws.getNeg(env.SubscriptionID)
-	if neg == nil {
+	sess := ws.getNeg(env.SubscriptionID)
+	if sess == nil {
 		ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: "unknown subscription"})
 		return
 	}
-	output, err := neg.Reconcile(env.Message)
+	sess.mu.Lock()
+	output, err := sess.neg.Reconcile(env.Message)
+	sess.mu.Unlock()
 	if err != nil {
 		ws.removeNeg(env.SubscriptionID)
 		ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: "reconcile failed: " + err.Error()})
