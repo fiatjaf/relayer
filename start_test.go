@@ -69,6 +69,33 @@ func TestServerStartShutdown(t *testing.T) {
 	}
 }
 
+func TestNewServerInitFailureDoesNotRegisterServer(t *testing.T) {
+	relay := &testRelay{
+		init: func() error { return fmt.Errorf("boom") },
+		storage: &testStorage{
+			init: func() error { return nil },
+		},
+	}
+
+	serversMutex.RLock()
+	before := len(servers)
+	serversMutex.RUnlock()
+
+	srv, err := NewServer(relay)
+	if err == nil {
+		t.Fatal("expected init error")
+	}
+	if srv != nil {
+		t.Fatal("expected nil server on init failure")
+	}
+	serversMutex.RLock()
+	after := len(servers)
+	serversMutex.RUnlock()
+	if after != before {
+		t.Fatalf("expected servers registry size %d, got %d", before, after)
+	}
+}
+
 func TestServerShutdownWebsocket(t *testing.T) {
 	defer goleak.VerifyNone(t)
 	// set up a new relay server

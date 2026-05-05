@@ -1,82 +1,85 @@
 package relayer
 
-import (
-	"sync"
-
-	"github.com/nbd-wtf/go-nostr"
-)
+import "github.com/nbd-wtf/go-nostr"
 
 type Listener struct {
 	filters nostr.Filters
 }
 
-var (
-	listeners      = make(map[*WebSocket]map[string]*Listener)
-	listenersMutex = sync.RWMutex{}
-)
-
 func GetListeningFilters() nostr.Filters {
-	listenersMutex.RLock()
-	defer listenersMutex.RUnlock()
-	respfilters := make(nostr.Filters, 0, len(listeners)*2)
+	serversMutex.RLock()
+	defer serversMutex.RUnlock()
 
-	// here we go through all the existing listeners
-	for _, connlisteners := range listeners {
-		for _, listener := range connlisteners {
-			for _, listenerfilter := range listener.filters {
-				for _, respfilter := range respfilters {
-					// check if this filter specifically is already added to respfilters
-					if nostr.FilterEqual(listenerfilter, respfilter) {
-						goto nextconn
-					}
-				}
-
-				// field not yet present on respfilters, add it
-				respfilters = append(respfilters, listenerfilter)
-
-				// continue to the next filter
-			nextconn:
-				continue
-			}
-		}
+	respfilters := make(nostr.Filters, 0, len(servers)*2)
+	for srv := range servers {
+		respfilters = appendDistinctFilters(respfilters, srv.GetListeningFilters())
 	}
 
-	// respfilters will be a slice with all the distinct filter we currently have active
 	return respfilters
 }
 
-func setListener(id string, ws *WebSocket, filters nostr.Filters) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
+func (s *Server) GetListeningFilters() nostr.Filters {
+	s.listenersMu.RLock()
+	defer s.listenersMu.RUnlock()
+	respfilters := make(nostr.Filters, 0, len(s.listeners)*2)
 
-	subs, ok := listeners[ws]
+	for _, connlisteners := range s.listeners {
+		for _, listener := range connlisteners {
+			respfilters = appendDistinctFilters(respfilters, listener.filters)
+		}
+	}
+
+	return respfilters
+}
+
+func appendDistinctFilters(dst nostr.Filters, src nostr.Filters) nostr.Filters {
+	for _, listenerfilter := range src {
+		duplicate := false
+		for _, respfilter := range dst {
+			if nostr.FilterEqual(listenerfilter, respfilter) {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			dst = append(dst, listenerfilter)
+		}
+	}
+	return dst
+}
+
+func (s *Server) setListener(id string, ws *WebSocket, filters nostr.Filters) {
+	s.listenersMu.Lock()
+	defer s.listenersMu.Unlock()
+
+	subs, ok := s.listeners[ws]
 	if !ok {
 		subs = make(map[string]*Listener)
-		listeners[ws] = subs
+		s.listeners[ws] = subs
 	}
 
 	subs[id] = &Listener{filters: filters}
 }
 
 // Remove a specific subscription id from listeners for a given ws client
-func removeListenerId(ws *WebSocket, id string) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
+func (s *Server) removeListenerId(ws *WebSocket, id string) {
+	s.listenersMu.Lock()
+	defer s.listenersMu.Unlock()
 
-	if subs, ok := listeners[ws]; ok {
-		delete(listeners[ws], id)
+	if subs, ok := s.listeners[ws]; ok {
+		delete(s.listeners[ws], id)
 		if len(subs) == 0 {
-			delete(listeners, ws)
+			delete(s.listeners, ws)
 		}
 	}
 }
 
 // Remove WebSocket conn from listeners
-func removeListener(ws *WebSocket) {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
-	clear(listeners[ws])
-	delete(listeners, ws)
+func (s *Server) removeListener(ws *WebSocket) {
+	s.listenersMu.Lock()
+	defer s.listenersMu.Unlock()
+	clear(s.listeners[ws])
+	delete(s.listeners, ws)
 }
 
 type listenerDelivery struct {
@@ -85,10 +88,10 @@ type listenerDelivery struct {
 	event nostr.Event
 }
 
-func notifyListeners(event *nostr.Event) {
-	listenersMutex.RLock()
-	deliveries := make([]listenerDelivery, 0, len(listeners))
-	for ws, subs := range listeners {
+func (s *Server) notifyListeners(event *nostr.Event) {
+	s.listenersMu.RLock()
+	deliveries := make([]listenerDelivery, 0, len(s.listeners))
+	for ws, subs := range s.listeners {
 		for id, listener := range subs {
 			if !listener.filters.Match(event) {
 				continue
@@ -100,10 +103,19 @@ func notifyListeners(event *nostr.Event) {
 			})
 		}
 	}
-	listenersMutex.RUnlock()
+	s.listenersMu.RUnlock()
 
 	for _, delivery := range deliveries {
 		delivery := delivery
 		delivery.ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &delivery.subID, Event: delivery.event})
+	}
+}
+
+func BroadcastEvent(evt *nostr.Event) {
+	serversMutex.RLock()
+	defer serversMutex.RUnlock()
+
+	for srv := range servers {
+		srv.notifyListeners(evt)
 	}
 }

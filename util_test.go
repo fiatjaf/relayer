@@ -107,9 +107,13 @@ func (st *testStorage) ReplaceEvent(ctx context.Context, e *nostr.Event) error {
 }
 
 func clearListeners() {
-	listenersMutex.Lock()
-	defer listenersMutex.Unlock()
-	listeners = make(map[*WebSocket]map[string]*Listener)
+	serversMutex.RLock()
+	defer serversMutex.RUnlock()
+	for srv := range servers {
+		srv.listenersMu.Lock()
+		srv.listeners = make(map[*WebSocket]map[string]*Listener)
+		srv.listenersMu.Unlock()
+	}
 }
 
 type testAdvancedStorage struct {

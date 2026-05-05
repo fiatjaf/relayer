@@ -44,11 +44,19 @@ type Server struct {
 	clientsMu sync.Mutex
 	clients   map[*websocket.Conn]struct{}
 
+	listenersMu sync.RWMutex
+	listeners   map[*WebSocket]map[string]*Listener
+
 	// in case you call Server.Start
 	Addr       string
 	serveMux   *http.ServeMux
 	httpServer *http.Server
 }
+
+var (
+	servers      = map[*Server]struct{}{}
+	serversMutex sync.RWMutex
+)
 
 func (s *Server) Router() *http.ServeMux {
 	return s.serveMux
@@ -69,11 +77,12 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 	}
 
 	srv := &Server{
-		Log:      defaultLogger(relay.Name() + ": "),
-		relay:    relay,
-		clients:  make(map[*websocket.Conn]struct{}),
-		serveMux: &http.ServeMux{},
-		options:  options,
+		Log:       defaultLogger(relay.Name() + ": "),
+		relay:     relay,
+		clients:   make(map[*websocket.Conn]struct{}),
+		listeners: make(map[*WebSocket]map[string]*Listener),
+		serveMux:  &http.ServeMux{},
+		options:   options,
 	}
 
 	if storage := relay.Storage(context.Background()); storage != nil {
@@ -87,11 +96,15 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 		return nil, fmt.Errorf("relay init: %w", err)
 	}
 
+	serversMutex.Lock()
+	servers[srv] = struct{}{}
+	serversMutex.Unlock()
+
 	// start listening from events from other sources, if any
 	if inj, ok := relay.(Injector); ok {
 		go func() {
 			for event := range inj.InjectEvents() {
-				notifyListeners(&event)
+				srv.notifyListeners(&event)
 			}
 		}()
 	}
@@ -146,7 +159,9 @@ func (s *Server) Start(host string, port int, started ...chan bool) error {
 // Note that the HTTP server make some time to shutdown and so the context deadline,
 // if any, may have been shortened by the time OnShutdown is called.
 func (s *Server) Shutdown(ctx context.Context) {
-	s.httpServer.Shutdown(ctx)
+	if s.httpServer != nil {
+		s.httpServer.Shutdown(ctx)
+	}
 
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
@@ -155,6 +170,10 @@ func (s *Server) Shutdown(ctx context.Context) {
 		conn.Close()
 		delete(s.clients, conn)
 	}
+
+	serversMutex.Lock()
+	delete(servers, s)
+	serversMutex.Unlock()
 
 	if f, ok := s.relay.(ShutdownAware); ok {
 		f.OnShutdown(ctx)

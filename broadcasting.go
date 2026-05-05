@@ -4,6 +4,6 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-func BroadcastEvent(evt *nostr.Event) {
-	notifyListeners(evt)
+func (s *Server) BroadcastEvent(evt *nostr.Event) {
+	s.notifyListeners(evt)
 }
