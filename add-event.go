@@ -53,7 +53,11 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 		}
 	}
 
-	notifyListeners(evt)
+	if srv, ok := getServer(ctx); ok {
+		srv.notifyListeners(evt)
+	} else {
+		BroadcastEvent(evt)
+	}
 
 	return true, ""
 }
