@@ -23,8 +23,8 @@ func handleWebpage(w http.ResponseWriter, r *http.Request) {
 	items := make([]HTML, 0, 200)
 	iter, err := relay.db.NewIter(nil)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "failed to read feeds: %v", err)
+		w.WriteHeader(500)
+		fmt.Fprint(w, "failed to create iterator: "+err.Error())
 		return
 	}
 	defer iter.Close()

@@ -52,7 +52,7 @@ func (r *Relay) Init() error {
 func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) (bool, string) {
 	// only accept they have a good preimage for a paid invoice for their public key
 	if !checkInvoicePaidOk(evt.PubKey) {
-		return false, "invoice not paid"
+		return false, "invoice is not paid"
 	}
 
 	// block events that are too large
