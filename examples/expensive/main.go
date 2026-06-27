@@ -49,19 +49,19 @@ func (r *Relay) Init() error {
 	return nil
 }
 
-func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) bool {
+func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) (bool, string) {
 	// only accept they have a good preimage for a paid invoice for their public key
 	if !checkInvoicePaidOk(evt.PubKey) {
-		return false
+		return false, "invoice not paid"
 	}
 
 	// block events that are too large
 	jsonb, _ := json.Marshal(evt)
 	if len(jsonb) > 100000 {
-		return false
+		return false, "event is too large"
 	}
 
-	return true
+	return true, ""
 }
 
 func main() {

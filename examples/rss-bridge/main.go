@@ -87,8 +87,8 @@ func (relay *Relay) Init() error {
 	return nil
 }
 
-func (relay *Relay) AcceptEvent(ctx context.Context, _ *nostr.Event) bool {
-	return false
+func (relay *Relay) AcceptEvent(ctx context.Context, _ *nostr.Event) (bool, string) {
+	return false, "rss bridge does not accept events"
 }
 
 func (relay *Relay) Storage(ctx context.Context) eventstore.Store {
@@ -107,6 +107,10 @@ func (b store) SaveEvent(ctx context.Context, _ *nostr.Event) error {
 
 func (b store) DeleteEvent(ctx context.Context, target *nostr.Event) error {
 	return errors.New("blocked: we can't delete any events")
+}
+
+func (b store) ReplaceEvent(ctx context.Context, _ *nostr.Event) error {
+	return errors.New("blocked: we don't accept any events")
 }
 
 func (b store) QueryEvents(ctx context.Context, filter nostr.Filter) (chan *nostr.Event, error) {
