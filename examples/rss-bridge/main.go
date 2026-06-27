@@ -75,7 +75,7 @@ func (relay *Relay) Init() error {
 							if !ok || time.Unix(last.(int64), 0).Before(evt.CreatedAt.Time()) {
 								evt.Sign(entity.PrivateKey)
 								relay.updates <- evt
-								relay.lastEmitted.Store(entity.URL, last)
+								relay.lastEmitted.Store(entity.URL, evt.CreatedAt.Time().Unix())
 							}
 						}
 					}
@@ -87,8 +87,8 @@ func (relay *Relay) Init() error {
 	return nil
 }
 
-func (relay *Relay) AcceptEvent(ctx context.Context, _ *nostr.Event) bool {
-	return false
+func (relay *Relay) AcceptEvent(ctx context.Context, _ *nostr.Event) (bool, string) {
+	return false, "rss-bridge does not accept events"
 }
 
 func (relay *Relay) Storage(ctx context.Context) eventstore.Store {
@@ -105,6 +105,10 @@ func (b store) SaveEvent(ctx context.Context, _ *nostr.Event) error {
 	return errors.New("blocked: we don't accept any events")
 }
 
+func (b store) ReplaceEvent(ctx context.Context, _ *nostr.Event) error {
+	return errors.New("blocked: we don't accept any events")
+}
+
 func (b store) DeleteEvent(ctx context.Context, target *nostr.Event) error {
 	return errors.New("blocked: we can't delete any events")
 }
@@ -116,6 +120,8 @@ func (b store) QueryEvents(ctx context.Context, filter nostr.Filter) (chan *nost
 
 	evts := make(chan *nostr.Event)
 	go func() {
+		defer close(evts)
+
 		for _, pubkey := range filter.Authors {
 			if val, closer, err := relay.db.Get([]byte(pubkey)); err == nil {
 				defer closer.Close()
@@ -167,7 +173,7 @@ func (b store) QueryEvents(ctx context.Context, filter nostr.Filter) (chan *nost
 						evts <- &evt
 					}
 
-					relay.lastEmitted.Store(entity.URL, last)
+					relay.lastEmitted.Store(entity.URL, int64(last))
 				}
 			}
 		}

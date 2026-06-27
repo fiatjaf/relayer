@@ -33,14 +33,14 @@ func (r *Relay) Init() error {
 	return nil
 }
 
-func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) bool {
+func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) (bool, string) {
 	// block events that are too large
 	// jsonb, _ := json.Marshal(evt)
 	// if len(jsonb) > 100000 {
-	// 	return false
+	// 	return false, "event is too large"
 	// }
 
-	return true
+	return true, ""
 }
 
 func (r *Relay) BeforeSave(evt *nostr.Event) {
