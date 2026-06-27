@@ -31,7 +31,7 @@ func (r *Relay) Init() error {
 	return nil
 }
 
-func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) bool {
+func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) (bool, string) {
 	// disallow anything from non-authorized pubkeys
 	found := false
 	for _, pubkey := range r.Whitelist {
@@ -41,16 +41,16 @@ func (r *Relay) AcceptEvent(ctx context.Context, evt *nostr.Event) bool {
 		}
 	}
 	if !found {
-		return false
+		return false, "pubkey is not whitelisted"
 	}
 
 	// block events that are too large
 	jsonb, _ := json.Marshal(evt)
 	if len(jsonb) > 100000 {
-		return false
+		return false, "event is too large"
 	}
 
-	return true
+	return true, ""
 }
 
 func main() {

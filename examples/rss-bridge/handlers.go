@@ -21,7 +21,13 @@ var head = H("head",
 
 func handleWebpage(w http.ResponseWriter, r *http.Request) {
 	items := make([]HTML, 0, 200)
-	iter := relay.db.NewIter(nil)
+	iter, err := relay.db.NewIter(nil)
+	if err != nil {
+		w.WriteHeader(500)
+		fmt.Fprint(w, "failed to create iterator: "+err.Error())
+		return
+	}
+	defer iter.Close()
 	for iter.First(); iter.Valid(); iter.Next() {
 		pubkey := string(iter.Key())
 		var entity Entity
