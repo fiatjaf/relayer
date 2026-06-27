@@ -486,7 +486,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 		if _, ok := s.relay.(Auther); ok {
 			supportedNIPs = append(supportedNIPs, 42)
 		}
-		if storage, ok := s.relay.(eventstore.Store); ok && storage != nil {
+		if storage := s.relay.Storage(r.Context()); storage != nil {
 			if _, ok = storage.(EventCounter); ok {
 				supportedNIPs = append(supportedNIPs, 45)
 			}

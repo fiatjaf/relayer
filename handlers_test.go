@@ -3,6 +3,7 @@ package relayer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -417,6 +418,32 @@ func TestHandleNIP11(t *testing.T) {
 	if info.Software != "https://github.com/fiatjaf/relayer" {
 		t.Errorf("unexpected software: %q", info.Software)
 	}
+}
+
+func TestHandleNIP11IncludesNIP45ForCounterStorage(t *testing.T) {
+	srv := startTestRelay(t, &testRelay{
+		name:    "test-nip45",
+		storage: &testStorageWithCounter{},
+	})
+	defer srv.Shutdown(context.TODO())
+
+	req, _ := http.NewRequest("GET", "http://"+srv.Addr, nil)
+	req.Header.Set("Accept", "application/nostr+json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var info nip11.RelayInformationDocument
+	json.NewDecoder(resp.Body).Decode(&info)
+
+	for _, nip := range info.SupportedNIPs {
+		if fmt.Sprint(nip) == "45" {
+			return
+		}
+	}
+	t.Fatalf("expected supported_nips to include 45, got %#v", info.SupportedNIPs)
 }
 
 // --- GetAuthStatus tests ---
