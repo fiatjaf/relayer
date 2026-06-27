@@ -105,3 +105,31 @@ func (st *testStorage) ReplaceEvent(ctx context.Context, e *nostr.Event) error {
 	}
 	return nil
 }
+
+func clearListeners() {
+	serversMutex.RLock()
+	defer serversMutex.RUnlock()
+	for srv := range servers {
+		srv.listenersMu.Lock()
+		srv.listeners = make(map[*WebSocket]map[string]*Listener)
+		srv.listenersMu.Unlock()
+	}
+}
+
+type testAdvancedStorage struct {
+	testStorage
+	beforeSave func(context.Context, *nostr.Event)
+	afterSave  func(*nostr.Event)
+}
+
+func (s *testAdvancedStorage) BeforeSave(ctx context.Context, evt *nostr.Event) {
+	if s.beforeSave != nil {
+		s.beforeSave(ctx, evt)
+	}
+}
+
+func (s *testAdvancedStorage) AfterSave(evt *nostr.Event) {
+	if s.afterSave != nil {
+		s.afterSave(evt)
+	}
+}

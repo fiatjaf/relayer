@@ -18,9 +18,6 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 	}
 
 	store := relay.Storage(ctx)
-	wrapper := &eventstore.RelayWrapper{
-		Store: store,
-	}
 	advancedSaver, _ := store.(AdvancedSaver)
 
 	if ok, msg := relay.AcceptEvent(ctx, evt); !ok {
@@ -30,17 +27,17 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 		return false, msg
 	}
 
-	if 20000 <= evt.Kind && evt.Kind < 30000 {
+	if nostr.IsEphemeralKind(evt.Kind) {
 		// do not store ephemeral events
 	} else {
 		if advancedSaver != nil {
 			advancedSaver.BeforeSave(ctx, evt)
 		}
 
-		if saveErr := wrapper.Publish(ctx, *evt); saveErr != nil {
+		if saveErr := saveEvent(ctx, store, evt); saveErr != nil {
 			switch saveErr {
 			case eventstore.ErrDupEvent:
-				return true, saveErr.Error()
+				return true, ""
 			default:
 				errmsg := saveErr.Error()
 				if nip20prefixmatcher.MatchString(errmsg) {
@@ -56,7 +53,19 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 		}
 	}
 
-	notifyListeners(evt)
+	if srv, ok := getServer(ctx); ok {
+		srv.notifyListeners(evt)
+	} else {
+		BroadcastEvent(evt)
+	}
 
 	return true, ""
+}
+
+func saveEvent(ctx context.Context, store eventstore.Store, evt *nostr.Event) error {
+	if nostr.IsRegularKind(evt.Kind) {
+		return store.SaveEvent(ctx, evt)
+	}
+
+	return store.ReplaceEvent(ctx, evt)
 }

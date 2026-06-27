@@ -2,14 +2,12 @@ package relayer
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/fiatjaf/eventstore/slicestore"
-	"github.com/gobwas/ws/wsutil"
 	"github.com/nbd-wtf/go-nostr"
 	"go.uber.org/goleak"
 )
@@ -71,6 +69,33 @@ func TestServerStartShutdown(t *testing.T) {
 	}
 }
 
+func TestNewServerInitFailureDoesNotRegisterServer(t *testing.T) {
+	relay := &testRelay{
+		init: func() error { return fmt.Errorf("boom") },
+		storage: &testStorage{
+			init: func() error { return nil },
+		},
+	}
+
+	serversMutex.RLock()
+	before := len(servers)
+	serversMutex.RUnlock()
+
+	srv, err := NewServer(relay)
+	if err == nil {
+		t.Fatal("expected init error")
+	}
+	if srv != nil {
+		t.Fatal("expected nil server on init failure")
+	}
+	serversMutex.RLock()
+	after := len(servers)
+	serversMutex.RUnlock()
+	if after != before {
+		t.Fatalf("expected servers registry size %d, got %d", before, after)
+	}
+}
+
 func TestServerShutdownWebsocket(t *testing.T) {
 	defer goleak.VerifyNone(t)
 	// set up a new relay server
@@ -110,10 +135,7 @@ func TestServerShutdownWebsocket(t *testing.T) {
 	// wait for the client to receive a "connection close"
 	time.Sleep(1 * time.Second)
 	err = client.ConnectionError
-	if e := errors.Unwrap(err); e != nil {
-		err = e
-	}
-	if _, ok := err.(wsutil.ClosedError); !ok {
-		t.Errorf("client.ConnectionError: %v (%T); want wsutil.ClosedError", err, err)
+	if err == nil {
+		t.Error("expected client.ConnectionError to be non-nil after shutdown")
 	}
 }

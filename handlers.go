@@ -133,7 +133,7 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 			}
 		}
 
-		notifyListeners(&evt)
+		s.notifyListeners(&evt)
 		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
 		return ""
 	}
@@ -163,28 +163,8 @@ func (s *Server) doCount(ctx context.Context, ws *WebSocket, request []json.RawM
 		}
 
 		filter := filters[i]
-
-		// prevent kind-4 events from being returned to unauthed users,
-		//   only when authentication is a thing
-		if _, ok := s.relay.(Auther); ok {
-			if slices.Contains(filter.Kinds, 4) {
-				senders := filter.Authors
-				receivers, _ := filter.Tags["p"]
-				switch {
-				case ws.authed == "":
-					// not authenticated
-					return "restricted: this relay does not serve kind-4 to unauthenticated users, does your client implement NIP-42?"
-				case len(senders) == 1 && len(receivers) < 2 && (senders[0] == ws.authed):
-					// allowed filter: ws.authed is sole sender (filter specifies one or all receivers)
-				case len(receivers) == 1 && len(senders) < 2 && (receivers[0] == ws.authed):
-					// allowed filter: ws.authed is sole receiver (filter specifies one or all senders)
-				default:
-					// restricted filter: do not return any events,
-					//   even if other elements in filters array were not restricted).
-					//   client should know better.
-					return "restricted: authenticated user does not have authorization for requested filters."
-				}
-			}
+		if reason := s.validateFilterAccess(ws, filter, false); reason != "" {
+			return reason
 		}
 
 		count, err := counter.CountEvents(ctx, filter)
@@ -232,35 +212,12 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 	}
 
 	for _, filter := range filters {
-
-		// prevent kind-4 events from being returned to unauthed users,
-		//   only when authentication is a thing
-		if _, ok := s.relay.(Auther); ok {
-			if slices.Contains(filter.Kinds, 4) {
-				senders := filter.Authors
-				receivers, _ := filter.Tags["p"]
-				switch {
-				case ws.authed == "":
-					ws.WriteJSON(nostr.ClosedEnvelope{
-						SubscriptionID: id,
-						Reason:         "restricted: this relay does not serve kind-4 to unauthenticated users, does your client implement NIP-42?",
-					})
-					return ""
-				case len(senders) == 1 && len(receivers) < 2 && (senders[0] == ws.authed):
-					// allowed filter: ws.authed is sole sender (filter specifies one or all receivers)
-				case len(receivers) == 1 && len(senders) < 2 && (receivers[0] == ws.authed):
-					// allowed filter: ws.authed is sole receiver (filter specifies one or all senders)
-				default:
-					// restricted filter: do not return any events,
-					//   even if other elements in filters array were not restricted).
-					//   client should know better.
-					ws.WriteJSON(nostr.ClosedEnvelope{
-						SubscriptionID: id,
-						Reason:         "restricted: authenticated user does not have authorization for requested filters.",
-					})
-					return ""
-				}
-			}
+		if reason := s.validateFilterAccess(ws, filter, true); reason != "" {
+			ws.WriteJSON(nostr.ClosedEnvelope{
+				SubscriptionID: id,
+				Reason:         reason,
+			})
+			return ""
 		}
 
 		events, err := store.QueryEvents(ctx, filter)
@@ -293,7 +250,7 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 	}
 
 	ws.WriteJSON(nostr.EOSEEnvelope(id))
-	setListener(id, ws, filters)
+	s.setListener(id, ws, filters)
 	return ""
 }
 
@@ -304,7 +261,7 @@ func (s *Server) doClose(ctx context.Context, ws *WebSocket, request []json.RawM
 		return "CLOSE has no <id>"
 	}
 
-	removeListenerId(ws, id)
+	s.removeListenerId(ws, id)
 	return ""
 }
 
@@ -347,6 +304,7 @@ func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byt
 	json.Unmarshal(request[0], &typ)
 
 	ctx = context.WithValue(ctx, AUTH_CONTEXT_KEY, ws)
+	ctx = context.WithValue(ctx, SERVER_CONTEXT_KEY, s)
 
 	switch typ {
 	case "EVENT":
@@ -373,6 +331,38 @@ func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byt
 			ws.WriteJSON(nostr.AuthEnvelope{Challenge: &ws.challenge})
 		}
 	}
+}
+
+func (s *Server) validateFilterAccess(ws *WebSocket, filter nostr.Filter, allowGiftWrapCheck bool) string {
+	if _, ok := s.relay.(Auther); !ok {
+		return ""
+	}
+
+	if slices.Contains(filter.Kinds, 4) {
+		senders := filter.Authors
+		receivers, _ := filter.Tags["p"]
+		switch {
+		case ws.authed == "":
+			return "restricted: this relay does not serve kind-4 to unauthenticated users, does your client implement NIP-42?"
+		case len(senders) == 1 && len(receivers) < 2 && senders[0] == ws.authed:
+		case len(receivers) == 1 && len(senders) < 2 && receivers[0] == ws.authed:
+		default:
+			return "restricted: authenticated user does not have authorization for requested filters."
+		}
+	}
+
+	if allowGiftWrapCheck && slices.Contains(filter.Kinds, nostr.KindGiftWrap) {
+		receivers, _ := filter.Tags["p"]
+		switch {
+		case ws.authed == "":
+			return "restricted: this relay does not serve gift-wrapped events to unauthenticated users, does your client implement NIP-42?"
+		case len(receivers) == 1 && receivers[0] == ws.authed:
+		default:
+			return "restricted: authenticated user does not have authorization for requested filters."
+		}
+	}
+
+	return ""
 }
 
 func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
@@ -416,7 +406,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			if _, ok := s.clients[conn]; ok {
 				conn.Close()
 				delete(s.clients, conn)
-				removeListener(ws)
+				s.removeListener(ws)
 			}
 			s.clientsMu.Unlock()
 			s.Log.Infof("disconnected from %s", ip)
@@ -496,7 +486,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 		if _, ok := s.relay.(Auther); ok {
 			supportedNIPs = append(supportedNIPs, 42)
 		}
-		if storage, ok := s.relay.(eventstore.Store); ok && storage != nil {
+		if storage := s.relay.Storage(r.Context()); storage != nil {
 			if _, ok = storage.(EventCounter); ok {
 				supportedNIPs = append(supportedNIPs, 45)
 			}
