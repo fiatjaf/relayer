@@ -28,7 +28,6 @@ func handleWebpage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer iter.Close()
-
 	for iter.First(); iter.Valid(); iter.Next() {
 		pubkey := string(iter.Key())
 		var entity Entity
