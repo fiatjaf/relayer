@@ -72,7 +72,6 @@ func readMsg(t *testing.T, conn *websocket.Conn) (string, []json.RawMessage) {
 // authenticate performs NIP-42 auth via the GETCHALLENGE custom message.
 func authenticate(t *testing.T, conn *websocket.Conn, sk string, relayURL string) string {
 	t.Helper()
-	pub, _ := nostr.GetPublicKey(sk)
 
 	// get challenge from server
 	conn.WriteJSON([]interface{}{"GETCHALLENGE", ""})
@@ -82,6 +81,12 @@ func authenticate(t *testing.T, conn *websocket.Conn, sk string, relayURL string
 	}
 	var challenge string
 	json.Unmarshal(raw[1], &challenge)
+	return authenticateWithChallenge(t, conn, sk, relayURL, challenge)
+}
+
+func authenticateWithChallenge(t *testing.T, conn *websocket.Conn, sk string, relayURL, challenge string) string {
+	t.Helper()
+	pub, _ := nostr.GetPublicKey(sk)
 
 	// create and sign auth event
 	authEvt := nip42.CreateUnsignedAuthEvent(challenge, pub, relayURL)
@@ -89,7 +94,7 @@ func authenticate(t *testing.T, conn *websocket.Conn, sk string, relayURL string
 
 	// send AUTH
 	conn.WriteJSON([]interface{}{"AUTH", authEvt})
-	typ, raw = readMsg(t, conn)
+	typ, raw := readMsg(t, conn)
 	if typ != "OK" {
 		t.Fatalf("expected OK, got %s", typ)
 	}
@@ -116,13 +121,37 @@ func TestNIP59_GiftWrap_Unauthenticated(t *testing.T) {
 	conn.WriteJSON([]interface{}{"REQ", "sub1", nostr.Filter{Kinds: []int{nostr.KindGiftWrap}}})
 
 	typ, raw := readMsg(t, conn)
+	if typ != "AUTH" {
+		t.Fatalf("expected AUTH challenge, got %s", typ)
+	}
+	var challenge string
+	json.Unmarshal(raw[1], &challenge)
+	if challenge == "" {
+		t.Fatal("expected non-empty AUTH challenge")
+	}
+
+	typ, raw = readMsg(t, conn)
 	if typ != "CLOSED" {
 		t.Fatalf("expected CLOSED, got %s", typ)
 	}
 	var reason string
 	json.Unmarshal(raw[2], &reason)
-	if reason != "restricted: this relay does not serve gift-wrapped events to unauthenticated users, does your client implement NIP-42?" {
+	if reason != "auth-required: this relay requires NIP-42 authentication to serve gift-wrapped events" {
 		t.Errorf("unexpected reason: %q", reason)
+	}
+
+	// Authenticate using the relay-provided challenge and retry a
+	// recipient-scoped subscription, as a NIP-42 client would.
+	sk := nostr.GeneratePrivateKey()
+	pub := authenticateWithChallenge(t, conn, sk, "ws://"+srv.Addr, challenge)
+	conn.WriteJSON([]interface{}{"REQ", "sub2", nostr.Filter{
+		Kinds: []int{nostr.KindGiftWrap},
+		Tags:  nostr.TagMap{"p": []string{pub}},
+	}})
+
+	typ, _ = readMsg(t, conn)
+	if typ != "EOSE" {
+		t.Fatalf("expected EOSE after authentication, got %s", typ)
 	}
 }
 
