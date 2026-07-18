@@ -213,6 +213,9 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 
 	for _, filter := range filters {
 		if reason := s.validateFilterAccess(ws, filter, true); reason != "" {
+			if strings.HasPrefix(reason, "auth-required:") {
+				s.sendAuthChallenge(ws)
+			}
 			ws.WriteJSON(nostr.ClosedEnvelope{
 				SubscriptionID: id,
 				Reason:         reason,
@@ -327,9 +330,13 @@ func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byt
 
 	// NIP-42 auth challenge
 	if strings.HasPrefix(notice, "auth-required:") {
-		if _, ok := s.relay.(Auther); ok {
-			ws.WriteJSON(nostr.AuthEnvelope{Challenge: &ws.challenge})
-		}
+		s.sendAuthChallenge(ws)
+	}
+}
+
+func (s *Server) sendAuthChallenge(ws *WebSocket) {
+	if _, ok := s.relay.(Auther); ok {
+		ws.WriteJSON(nostr.AuthEnvelope{Challenge: &ws.challenge})
 	}
 }
 
@@ -343,7 +350,7 @@ func (s *Server) validateFilterAccess(ws *WebSocket, filter nostr.Filter, allowG
 		receivers, _ := filter.Tags["p"]
 		switch {
 		case ws.authed == "":
-			return "restricted: this relay does not serve kind-4 to unauthenticated users, does your client implement NIP-42?"
+			return "auth-required: this relay requires NIP-42 authentication to serve kind-4 events"
 		case len(senders) == 1 && len(receivers) < 2 && senders[0] == ws.authed:
 		case len(receivers) == 1 && len(senders) < 2 && receivers[0] == ws.authed:
 		default:
@@ -355,7 +362,7 @@ func (s *Server) validateFilterAccess(ws *WebSocket, filter nostr.Filter, allowG
 		receivers, _ := filter.Tags["p"]
 		switch {
 		case ws.authed == "":
-			return "restricted: this relay does not serve gift-wrapped events to unauthenticated users, does your client implement NIP-42?"
+			return "auth-required: this relay requires NIP-42 authentication to serve gift-wrapped events"
 		case len(receivers) == 1 && receivers[0] == ws.authed:
 		default:
 			return "restricted: authenticated user does not have authorization for requested filters."
