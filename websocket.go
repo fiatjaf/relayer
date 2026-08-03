@@ -15,6 +15,10 @@ type WebSocket struct {
 	challenge string
 	authed    string
 	limiter   *rate.Limiter
+
+	// nip77
+	negsMu sync.Mutex
+	negs   map[string]*negSession
 }
 
 func (ws *WebSocket) WriteJSON(any interface{}) error {
