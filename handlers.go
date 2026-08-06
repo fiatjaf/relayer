@@ -471,7 +471,9 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			case <-ticker.C:
 				err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait))
 				if err != nil {
-					s.Log.Errorf("error writing ping: %v; closing websocket", err)
+					// a client that goes away between keepalives is ordinary churn
+					// on a public relay, not a fault: log it at info, not error.
+					s.Log.Infof("ping failed for %s, closing websocket: %v", ip, err)
 					return
 				}
 				s.Log.Infof("pinging for %s", ip)
