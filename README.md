@@ -1,6 +1,7 @@
-Nostr Relay Framework -- use it to implement your own custom relay.
+nip5 nip42 auth relay 
+=====================
 
-There is an example/reference implementation at [basic](/examples/basic/). Binaries for that are also available under [Releases](
-https://github.com/fiatjaf/relayer/releases).
 
-<a href="https://godoc.org/github.com/fiatjaf/relayer"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
+Some basic code to disallow both read and write access, except to post kind 0 profile notes.
+
+Users with a valid nip5 on specific domains can get nip42 auth access and subsequently read and write notes.

@@ -274,11 +274,23 @@ func (s *Server) doAuth(ctx context.Context, ws *WebSocket, request []json.RawMe
 		if err := json.Unmarshal(request[1], &evt); err != nil {
 			return "failed to decode auth event: " + err.Error()
 		}
-		if pubkey, ok := nip42.ValidateAuthEvent(&evt, ws.challenge, auther.ServiceURL()); ok {
-			ws.authed = pubkey
-			ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
+		
+		// Use custom authentication if available
+		if customAuther, ok := s.relay.(CustomAuther); ok {
+			if valid, reason := customAuther.Authenticate(ctx, &evt); valid {
+				ws.authed = evt.PubKey
+				ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
+			} else {
+				ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: reason})
+			}
 		} else {
-			ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "error: failed to authenticate"})
+			// Fall back to standard NIP-42 validation
+			if pubkey, ok := nip42.ValidateAuthEvent(&evt, ws.challenge, auther.ServiceURL()); ok {
+				ws.authed = pubkey
+				ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: true})
+			} else {
+				ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "error: failed to authenticate"})
+			}
 		}
 	}
 	return ""
