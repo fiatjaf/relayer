@@ -268,6 +268,120 @@ func TestDoReq_NoResults(t *testing.T) {
 	}
 }
 
+// recvEOSE reads an EOSE envelope and returns the NIP-67 completeness hints
+// (nil when the relay sent a bare two-element EOSE).
+func recvEOSE(t *testing.T, conn *websocket.Conn) (subID string, hints []string) {
+	t.Helper()
+	typ, raw := recvMessage(t, conn)
+	if typ != "EOSE" {
+		t.Fatalf("expected EOSE, got %s", typ)
+	}
+	json.Unmarshal(raw[1], &subID)
+	if len(raw) > 2 {
+		json.Unmarshal(raw[2], &hints)
+	}
+	return
+}
+
+// TestDoReq_EOSEFinishHint: when the relay has drained every matching event it
+// must mark the EOSE with the NIP-67 "finish" hint.
+func TestDoReq_EOSEFinishHint(t *testing.T) {
+	srv := startTestRelay(t, &testRelay{storage: &slicestore.SliceStore{}})
+	defer srv.Shutdown(context.TODO())
+
+	conn := dialWS(t, srv.Addr)
+	sk := nostr.GeneratePrivateKey()
+
+	evt := signedEvent(sk, 1, "hello", nostr.Tags{})
+	sendJSON(t, conn, []interface{}{"EVENT", evt})
+	recvOK(t, conn)
+
+	sendJSON(t, conn, []interface{}{"REQ", "sub1", nostr.Filter{Kinds: []int{1}}})
+	typ, _ := recvMessage(t, conn)
+	if typ != "EVENT" {
+		t.Fatalf("expected EVENT, got %s", typ)
+	}
+	_, hints := recvEOSE(t, conn)
+	if len(hints) != 1 || hints[0] != "finish" {
+		t.Errorf("expected [finish] hint, got %v", hints)
+	}
+}
+
+// TestDoReq_EOSEFinishHintNoResults: an empty result set is still definitively
+// complete, so it carries the "finish" hint too.
+func TestDoReq_EOSEFinishHintNoResults(t *testing.T) {
+	srv := startTestRelay(t, &testRelay{storage: &slicestore.SliceStore{}})
+	defer srv.Shutdown(context.TODO())
+
+	conn := dialWS(t, srv.Addr)
+	sendJSON(t, conn, []interface{}{"REQ", "sub1", nostr.Filter{Kinds: []int{99999}}})
+
+	_, hints := recvEOSE(t, conn)
+	if len(hints) != 1 || hints[0] != "finish" {
+		t.Errorf("expected [finish] hint, got %v", hints)
+	}
+}
+
+// TestDoReq_EOSEMoreHint: a storage that hands back more events than the filter
+// limit lets the relay prove there are leftovers, so the EOSE carries "more".
+func TestDoReq_EOSEMoreHint(t *testing.T) {
+	sk := nostr.GeneratePrivateKey()
+	st := &testStorage{
+		queryEvents: func(_ context.Context, _ nostr.Filter) (chan *nostr.Event, error) {
+			// ignore the limit and emit 3 events
+			ch := make(chan *nostr.Event, 3)
+			for i := 0; i < 3; i++ {
+				evt := signedEvent(sk, 1, "hello", nostr.Tags{})
+				ch <- &evt
+			}
+			close(ch)
+			return ch, nil
+		},
+	}
+	srv := startTestRelay(t, &testRelay{storage: st})
+	defer srv.Shutdown(context.TODO())
+
+	conn := dialWS(t, srv.Addr)
+	sendJSON(t, conn, []interface{}{"REQ", "sub1", nostr.Filter{Kinds: []int{1}, Limit: 1}})
+
+	typ, _ := recvMessage(t, conn)
+	if typ != "EVENT" {
+		t.Fatalf("expected EVENT, got %s", typ)
+	}
+	_, hints := recvEOSE(t, conn)
+	if len(hints) != 1 || hints[0] != "more" {
+		t.Errorf("expected [more] hint, got %v", hints)
+	}
+}
+
+// TestDoReq_EOSENoHintWhenAmbiguous: when the storage returns exactly `limit`
+// events the relay cannot tell whether more exist (the storage may have capped
+// the query), so per NIP-67 it must stay silent rather than guess.
+func TestDoReq_EOSENoHintWhenAmbiguous(t *testing.T) {
+	srv := startTestRelay(t, &testRelay{storage: &slicestore.SliceStore{}})
+	defer srv.Shutdown(context.TODO())
+
+	conn := dialWS(t, srv.Addr)
+	sk := nostr.GeneratePrivateKey()
+
+	// publish 3 events but ask for only 1; slicestore caps the query at the limit
+	for i := 0; i < 3; i++ {
+		evt := signedEvent(sk, 1, "hello", nostr.Tags{})
+		sendJSON(t, conn, []interface{}{"EVENT", evt})
+		recvOK(t, conn)
+	}
+
+	sendJSON(t, conn, []interface{}{"REQ", "sub1", nostr.Filter{Kinds: []int{1}, Limit: 1}})
+	typ, _ := recvMessage(t, conn)
+	if typ != "EVENT" {
+		t.Fatalf("expected EVENT, got %s", typ)
+	}
+	_, hints := recvEOSE(t, conn)
+	if hints != nil {
+		t.Errorf("expected no hint (ambiguous), got %v", hints)
+	}
+}
+
 // --- doClose tests ---
 
 func TestDoClose_EmptyID(t *testing.T) {

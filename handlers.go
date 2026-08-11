@@ -211,6 +211,14 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 		}
 	}
 
+	// NIP-67: track whether we can give the client a definitive completeness
+	// hint on the EOSE. We only claim "finish" when every filter was provably
+	// exhausted, and "more" when at least one filter provably had extra events.
+	// When a filter stops exactly at its limit it is ambiguous (the storage may
+	// have capped the query), so we stay silent — absence is not definitive.
+	anyMore := false
+	allFinished := len(filters) > 0
+
 	for _, filter := range filters {
 		if reason := s.validateFilterAccess(ws, filter, true); reason != "" {
 			if strings.HasPrefix(reason, "auth-required:") {
@@ -226,6 +234,7 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 		events, err := store.QueryEvents(ctx, filter)
 		if err != nil {
 			s.Log.Errorf("store: %v", err)
+			allFinished = false
 			continue
 		}
 
@@ -233,26 +242,52 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 		if filter.Limit == 0 {
 			filter.Limit = 9999999999
 		}
-		i := 0
+		sent := 0
+		seen := 0
+		more := false
 		if events != nil {
 			for event := range events {
+				seen++
 				if s.options.skipEventFunc != nil && s.options.skipEventFunc(event) {
 					continue
 				}
-				ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
-				i++
-				if i >= filter.Limit {
+				if sent >= filter.Limit {
+					// there is at least one more event we are not sending
+					more = true
 					break
 				}
+				ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event})
+				sent++
 			}
 
 			// exhaust the channel (in case we broke out of it early) so it is closed by the storage
 			for range events {
 			}
 		}
+
+		// NIP-67 completeness bookkeeping for this filter:
+		//   more                 -> definitely more events than we sent
+		//   seen == filter.Limit -> ambiguous, the storage may have capped at the limit
+		//   otherwise            -> the channel was drained, so we sent everything
+		if more {
+			anyMore = true
+		}
+		if more || seen == filter.Limit {
+			allFinished = false
+		}
 	}
 
-	ws.WriteJSON(nostr.EOSEEnvelope(id))
+	// TODO: nostr.EOSEEnvelope is a bare string and can't carry the NIP-67 hint,
+	// so we hand-build the envelope here. Once go-nostr grows a Hints field on
+	// EOSEEnvelope, switch this back to writing the typed envelope.
+	switch {
+	case anyMore:
+		ws.WriteJSON([]any{"EOSE", id, []string{"more"}})
+	case allFinished:
+		ws.WriteJSON([]any{"EOSE", id, []string{"finish"}})
+	default:
+		ws.WriteJSON(nostr.EOSEEnvelope(id))
+	}
 	s.setListener(id, ws, filters)
 	return ""
 }
@@ -491,7 +526,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if ifmer, ok := s.relay.(Informationer); ok {
 		info = ifmer.GetNIP11InformationDocument()
 	} else {
-		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33}
+		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33, 67}
 		if _, ok := s.relay.(Auther); ok {
 			supportedNIPs = append(supportedNIPs, 42)
 		}
