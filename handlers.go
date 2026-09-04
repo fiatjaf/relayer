@@ -496,7 +496,9 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	} else {
 		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33}
 		if _, ok := s.relay.(Auther); ok {
-			supportedNIPs = append(supportedNIPs, 42)
+			// NIP-42 authentication gates private direct messages and
+			// gift-wrapped events, which relayer handles for Auther relays.
+			supportedNIPs = append(supportedNIPs, 17, 42, 59)
 		}
 		if storage := s.relay.Storage(r.Context()); storage != nil {
 			if _, ok = storage.(EventCounter); ok {
