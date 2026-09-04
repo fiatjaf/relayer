@@ -222,6 +222,9 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 			})
 			return ""
 		}
+		if filter.LimitZero {
+			continue
+		}
 
 		events, err := store.QueryEvents(ctx, filter)
 		if err != nil {

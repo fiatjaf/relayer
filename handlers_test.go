@@ -268,6 +268,49 @@ func TestDoReq_NoResults(t *testing.T) {
 	}
 }
 
+func TestDoReq_LimitZeroSkipsHistoryAndKeepsSubscription(t *testing.T) {
+	queries := 0
+	storage := &testStorage{
+		queryEvents: func(context.Context, nostr.Filter) (chan *nostr.Event, error) {
+			queries++
+			ch := make(chan *nostr.Event)
+			close(ch)
+			return ch, nil
+		},
+	}
+	srv := startTestRelay(t, &testRelay{storage: storage})
+	defer srv.Shutdown(context.TODO())
+
+	subscriber := dialWS(t, srv.Addr)
+	sendJSON(t, subscriber, []interface{}{"REQ", "live", map[string]interface{}{
+		"kinds": []int{1},
+		"limit": 0,
+	}})
+
+	typ, _ := recvMessage(t, subscriber)
+	if typ != "EOSE" {
+		t.Fatalf("expected EOSE, got %s", typ)
+	}
+	if queries != 0 {
+		t.Fatalf("storage queried %d times, want 0", queries)
+	}
+
+	publisher := dialWS(t, srv.Addr)
+	evt := signedEvent(nostr.GeneratePrivateKey(), 1, "live", nostr.Tags{})
+	sendJSON(t, publisher, []interface{}{"EVENT", evt})
+	recvOK(t, publisher)
+
+	typ, raw := recvMessage(t, subscriber)
+	if typ != "EVENT" {
+		t.Fatalf("expected live EVENT after EOSE, got %s", typ)
+	}
+	var subID string
+	json.Unmarshal(raw[1], &subID)
+	if subID != "live" {
+		t.Fatalf("expected subscription live, got %q", subID)
+	}
+}
+
 // --- doClose tests ---
 
 func TestDoClose_EmptyID(t *testing.T) {
