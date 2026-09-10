@@ -410,6 +410,21 @@ func (s *Server) handleMessage(ctx context.Context, ws *WebSocket, message []byt
 			ws.WriteJSON(nostr.NoticeEnvelope(notice))
 		}
 		return
+	} else if typ == "NEG-OPEN" || typ == "NEG-MSG" || typ == "NEG-CLOSE" {
+		// NIP-77 is a lock-step protocol: each NEG-MSG answers the frame the
+		// relay just sent, and Reconcile carries state from one frame to the
+		// next. Handing these to workers would let a NEG-MSG overtake its
+		// NEG-OPEN, or a NEG-CLOSE overtake either, so they run here in
+		// receive order like CLOSE does.
+		switch typ {
+		case "NEG-OPEN":
+			s.doNegOpen(ctx, ws, message, store)
+		case "NEG-MSG":
+			s.doNegMsg(ws, message)
+		case "NEG-CLOSE":
+			s.doNegClose(ws, message)
+		}
+		return
 	}
 	go s.handleParsedMessage(ctx, ws, request, store, typ, req)
 }
@@ -527,6 +542,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 			s.clientsMu.Unlock()
 			s.removeListener(ws)
+			ws.clearNegs()
 			s.Log.Infof("disconnected from %s", ip)
 		}()
 
@@ -603,7 +619,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if ifmer, ok := s.relay.(Informationer); ok {
 		info = ifmer.GetNIP11InformationDocument()
 	} else {
-		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33, 67}
+		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33, 67, 77}
 		if _, ok := s.relay.(Auther); ok {
 			// NIP-42 authentication gates private direct messages and
 			// gift-wrapped events, which relayer handles for Auther relays.
