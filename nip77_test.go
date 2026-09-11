@@ -47,7 +47,7 @@ func readNegMessage(t *testing.T, conn *websocket.Conn) nostr.Envelope {
 	if err != nil {
 		t.Fatalf("readMessage: %v", err)
 	}
-	env := nip77.ParseNegMessage(raw)
+	env := nip77.ParseNegMessage(string(raw))
 	if env == nil {
 		t.Fatalf("not a NEG envelope: %s", raw)
 	}
@@ -260,7 +260,7 @@ func TestNIP77_CloseUnknownSubscription(t *testing.T) {
 	}
 
 	// it must still decode as an error for clients using go-nostr's parser
-	if _, ok := nip77.ParseNegMessage(raw).(*nip77.ErrorEnvelope); !ok {
+	if _, ok := nip77.ParseNegMessage(string(raw)).(*nip77.ErrorEnvelope); !ok {
 		t.Errorf("go-nostr does not parse %s as a NEG error", raw)
 	}
 }
