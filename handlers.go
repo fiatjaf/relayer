@@ -42,7 +42,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-func challenge(conn *websocket.Conn) *WebSocket {
+func challenge(conn *websocket.Conn, ip string) *WebSocket {
 	// NIP-42 challenge
 	challenge := make([]byte, 8)
 	rand.Read(challenge)
@@ -50,7 +50,27 @@ func challenge(conn *websocket.Conn) *WebSocket {
 	return &WebSocket{
 		conn:      conn,
 		challenge: hex.EncodeToString(challenge),
+		ip:        ip,
 	}
+}
+
+// clientIP reports the address the request came from. A proxy header is only
+// worth reading when a proxy actually set it, so a server behind one names it
+// in Options.WithTrustedProxyHeader; anything else is a value the client itself
+// can choose. X-Forwarded-For accumulates one entry per hop and the client's
+// own address is the first.
+func clientIP(r *http.Request, header string, conn *websocket.Conn) string {
+	if header != "" {
+		if v := r.Header.Get(header); v != "" {
+			if first, _, found := strings.Cut(v, ","); found {
+				v = first
+			}
+			if v = strings.TrimSpace(v); v != "" {
+				return v
+			}
+		}
+	}
+	return conn.RemoteAddr().String()
 }
 
 func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawMessage, store eventstore.Store) string {
@@ -509,15 +529,10 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	s.clientsMu.Unlock()
 	ticker := time.NewTicker(pingPeriod)
 
-	ip := conn.RemoteAddr().String()
-	if realIP := r.Header.Get("X-Forwarded-For"); realIP != "" {
-		ip = realIP // possible to be multiple comma separated
-	} else if realIP := r.Header.Get("X-Real-Ip"); realIP != "" {
-		ip = realIP
-	}
+	ip := clientIP(r, s.options.trustedProxyHeader, conn)
 	s.Log.Infof("connected from %s", ip)
 
-	ws := challenge(conn)
+	ws := challenge(conn, ip)
 
 	if s.options.perConnectionLimiter != nil {
 		ws.limiter = rate.NewLimiter(
@@ -563,7 +578,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					websocket.CloseNoStatusReceived, // 1005
 					websocket.CloseAbnormalClosure,  // 1006
 				) {
-					s.Log.Warningf("unexpected close error from %s: %v", r.Header.Get("X-Forwarded-For"), err)
+					s.Log.Warningf("unexpected close error from %s: %v", ip, err)
 				}
 				break
 			}

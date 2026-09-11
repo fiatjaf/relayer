@@ -203,6 +203,7 @@ type Option func(*Options)
 type Options struct {
 	perConnectionLimiter *rate.Limiter
 	skipEventFunc        func(*nostr.Event) bool
+	trustedProxyHeader   string
 }
 
 func DefaultOptions() *Options {
@@ -218,6 +219,18 @@ func WithPerConnectionLimiter(rps rate.Limit, burst int) Option {
 func WithSkipEventFunc(skipEventFunc func(*nostr.Event) bool) Option {
 	return func(o *Options) {
 		o.skipEventFunc = skipEventFunc
+	}
+}
+
+// WithTrustedProxyHeader names the header carrying the client address, for a
+// relay that only ever receives connections through a proxy that sets it —
+// "CF-Connecting-IP" behind Cloudflare, "X-Forwarded-For" behind an ingress
+// that appends to it. Leave it unset when clients can reach the relay
+// directly: any client can send whichever header it likes, so reading one that
+// nothing overwrites records an address of the client's choosing.
+func WithTrustedProxyHeader(header string) Option {
+	return func(o *Options) {
+		o.trustedProxyHeader = header
 	}
 }
 

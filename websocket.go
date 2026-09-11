@@ -11,6 +11,9 @@ type WebSocket struct {
 	conn  *websocket.Conn
 	mutex sync.Mutex
 
+	// The address the connection came from, as resolved by clientIP.
+	ip string
+
 	// Protected by Server.listenersMu. Disconnect permanently forbids new listeners.
 	disconnected bool
 	requests     map[string]*subscriptionRequest
