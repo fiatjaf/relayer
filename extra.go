@@ -18,6 +18,19 @@ func GetAuthStatus(ctx context.Context) (pubkey string, ok bool) {
 	return "", false
 }
 
+// GetIP reports the address the connection handling ctx came from, resolved the
+// same way as the "connected from" log line.
+func GetIP(ctx context.Context) (ip string, ok bool) {
+	value := ctx.Value(AUTH_CONTEXT_KEY)
+	if value == nil {
+		return "", false
+	}
+	if ws, ok := value.(*WebSocket); ok {
+		return ws.ip, true
+	}
+	return "", false
+}
+
 func getServer(ctx context.Context) (*Server, bool) {
 	value := ctx.Value(SERVER_CONTEXT_KEY)
 	if value == nil {
