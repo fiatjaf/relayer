@@ -75,7 +75,7 @@ func writeNegErr(ws *WebSocket, subscriptionID string, reason string) {
 // the same auth/ReqAccepter checks as REQ so NIP-42/NIP-59 restrictions apply.
 func (s *Server) doNegOpen(ctx context.Context, ws *WebSocket, message []byte, store eventstore.Store) {
 	env := &nip77.OpenEnvelope{}
-	if err := env.UnmarshalJSON(message); err != nil {
+	if err := env.FromJSON(string(message)); err != nil {
 		writeNegErr(ws, "", "invalid: failed to decode NEG-OPEN: "+err.Error())
 		return
 	}
@@ -143,7 +143,7 @@ func (s *Server) doNegOpen(ctx context.Context, ws *WebSocket, message []byte, s
 // closed once a NEG-ERR is issued, and the client must reopen from scratch.
 func (s *Server) doNegMsg(ws *WebSocket, message []byte) {
 	env := &nip77.MessageEnvelope{}
-	if err := env.UnmarshalJSON(message); err != nil {
+	if err := env.FromJSON(string(message)); err != nil {
 		writeNegErr(ws, "", "invalid: failed to decode NEG-MSG: "+err.Error())
 		return
 	}
@@ -165,7 +165,7 @@ func (s *Server) doNegMsg(ws *WebSocket, message []byte) {
 
 func (s *Server) doNegClose(ws *WebSocket, message []byte) {
 	env := &nip77.CloseEnvelope{}
-	if err := env.UnmarshalJSON(message); err != nil {
+	if err := env.FromJSON(string(message)); err != nil {
 		return
 	}
 	ws.removeNeg(env.SubscriptionID)
