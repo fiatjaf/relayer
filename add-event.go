@@ -53,6 +53,17 @@ func AddEvent(ctx context.Context, relay Relay, evt *nostr.Event) (accepted bool
 		}
 	}
 
+	// with a Notifier, local delivery happens when the event comes back through
+	// Notifier.Notifications, so the event is handed over there and nowhere else.
+	if n := resolveNotifier(relay, store); n != nil {
+		if err := n.Notify(ctx, evt); err != nil {
+			if srv, ok := getServer(ctx); ok {
+				srv.Log.Errorf("failed to notify event %s: %v", evt.ID, err)
+			}
+		}
+		return true, ""
+	}
+
 	if srv, ok := getServer(ctx); ok {
 		srv.notifyListeners(evt)
 	} else {

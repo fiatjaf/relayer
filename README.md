@@ -32,3 +32,26 @@ The default NIP-11 document reports exactly this set. A relay implementing
 Note that the numbers 12, 15, 16, 20 and 33 still appear in that document for
 the benefit of older clients; those NIPs were merged into NIP-01 and no longer
 exist on their own.
+
+## Running several instances on one storage
+
+Live subscriptions are tracked in memory, so out of the box an event published
+to one instance is only pushed to the clients of that instance. To run several
+instances (behind a load balancer, say) against one shared storage, implement
+`Notifier` on your relay or on your storage:
+
+```go
+type Notifier interface {
+	Notify(context.Context, *nostr.Event) error
+	Notifications(context.Context) (<-chan *nostr.Event, error)
+}
+```
+
+`Notify` is called for every accepted event; `Notifications` must deliver the
+events accepted by every instance, this one included. With a `Notifier` present,
+events reach local subscribers only through `Notifications`, so there is a single
+delivery path and no duplicates.
+
+The transport is up to you — Redis pub/sub, NATS, or something native to the
+storage such as PostgreSQL `LISTEN`/`NOTIFY`. It only needs to carry events from
+`Notify` on one instance to `Notifications` on all of them.
