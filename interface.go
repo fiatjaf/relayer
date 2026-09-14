@@ -47,7 +47,9 @@ type Injector interface {
 
 // Notifier propagates accepted events between multiple relay instances that
 // share the same storage, so that clients subscribed on one instance receive
-// events published on another.
+// events published on another. It is [eventstore.Notifier], so a storage can
+// provide one natively (see [postgresql.PostgresBackend]) and a relay can
+// provide one on top of any storage.
 //
 // It is looked up first on the [Relay] and then on the [eventstore.Store]
 // returned by [Relay.Storage]; the first one found is used. When a Notifier is
@@ -55,16 +57,11 @@ type Injector interface {
 // every accepted event is passed to Notify, and only events arriving from
 // Notifications are delivered. An implementation must therefore also send back
 // the events it was asked to Notify about, including to the instance that
-// published them.
-type Notifier interface {
-	// Notify is called for every accepted event, after it has been saved.
-	// Ephemeral events are passed as well, even though they are not saved.
-	Notify(context.Context, *nostr.Event) error
-	// Notifications returns a channel delivering events accepted by any
-	// instance, including this one. The channel must stay open until ctx is
-	// done, reconnecting to the underlying transport as needed.
-	Notifications(context.Context) (<-chan *nostr.Event, error)
-}
+// published them. Ephemeral events are passed to Notify as well, even though
+// they are not saved.
+//
+// [postgresql.PostgresBackend]: https://pkg.go.dev/github.com/fiatjaf/eventstore/postgresql#PostgresBackend
+type Notifier = eventstore.Notifier
 
 // resolveNotifier returns the Notifier to use for relay, if any.
 func resolveNotifier(relay Relay, store eventstore.Store) Notifier {

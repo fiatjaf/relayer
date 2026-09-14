@@ -52,6 +52,8 @@ events accepted by every instance, this one included. With a `Notifier` present,
 events reach local subscribers only through `Notifications`, so there is a single
 delivery path and no duplicates.
 
-The transport is up to you — Redis pub/sub, NATS, or something native to the
-storage such as PostgreSQL `LISTEN`/`NOTIFY`. It only needs to carry events from
-`Notify` on one instance to `Notifications` on all of them.
+`Notifier` is `eventstore.Notifier`, and the `postgresql` storage implements it
+with `LISTEN`/`NOTIFY`, so a relay on PostgreSQL gets this for free. For any other
+storage the transport is up to you — Redis pub/sub, NATS, anything that carries
+events from `Notify` on one instance to `Notifications` on all of them; see
+[multi-instance](/examples/multi-instance/) for SQLite kept in sync over Redis.
