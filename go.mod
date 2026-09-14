@@ -13,6 +13,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/nbd-wtf/go-nostr v0.52.3
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/rif/cache2go v1.0.0
 	github.com/rs/cors v1.11.1
 	github.com/stevelacy/daz v0.1.4
@@ -93,6 +94,7 @@ require (
 	github.com/lightningnetwork/lnd/tlv v1.3.0 // indirect
 	github.com/lightningnetwork/lnd/tor v1.1.4 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
+	github.com/mattn/go-sqlite3 v1.14.24 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/mmcdole/goxpp v1.1.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -119,6 +121,7 @@ require (
 	go.opentelemetry.io/otel v1.34.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/arch v0.15.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/mod v0.40.0 // indirect

@@ -21,7 +21,8 @@ import (
 // It can serve HTTP requests and websockets, passing control over to a relay implementation.
 //
 // To implement a relay, it is enough to satisfy [Relay] interface. Other interfaces are
-// [Informationer], [CustomWebSocketHandler], [ShutdownAware] and AdvancedXxx types.
+// [Informationer], [CustomWebSocketHandler], [ShutdownAware], [Injector], [Notifier]
+// and AdvancedXxx types.
 // See their respective doc comments.
 //
 // The basic usage is to call Start or StartConf, which starts serving immediately.
@@ -99,6 +100,30 @@ func NewServer(relay Relay, opts ...Option) (*Server, error) {
 	// init the relay
 	if err := relay.Init(); err != nil {
 		return nil, fmt.Errorf("relay init: %w", err)
+	}
+
+	// start listening for events accepted by other instances sharing the storage, if any
+	if n := resolveNotifier(relay, relay.Storage(context.Background())); n != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		ch, err := n.Notifications(ctx)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("storage notifications: %w", err)
+		}
+		go func() {
+			defer cancel()
+			for {
+				select {
+				case event, ok := <-ch:
+					if !ok {
+						return
+					}
+					srv.notifyListeners(event)
+				case <-srv.done:
+					return
+				}
+			}
+		}()
 	}
 
 	serversMutex.Lock()
