@@ -15,6 +15,7 @@ import (
 	"github.com/fiatjaf/eventstore"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip11"
+	"github.com/nbd-wtf/go-nostr/nip40"
 	"github.com/nbd-wtf/go-nostr/nip42"
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
@@ -73,6 +74,19 @@ func clientIP(r *http.Request, header string, conn *websocket.Conn) string {
 	return conn.RemoteAddr().String()
 }
 
+// isExpired reports whether the event carries a NIP-40 expiration timestamp
+// that has passed. Malformed expiration values are ignored.
+func isExpired(evt *nostr.Event) bool {
+	exp := nip40.GetExpiration(evt.Tags)
+	return exp != -1 && exp <= nostr.Now()
+}
+
+// skipEvent reports whether a stored event must not be sent to clients:
+// expired events (NIP-40) and whatever the relay's SkipEventFunc rejects.
+func (s *Server) skipEvent(evt *nostr.Event) bool {
+	return isExpired(evt) || (s.options.skipEventFunc != nil && s.options.skipEventFunc(evt))
+}
+
 func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawMessage, store eventstore.Store) string {
 	advancedDeleter, _ := store.(AdvancedDeleter)
 	latestIndex := len(request) - 1
@@ -97,6 +111,13 @@ func (s *Server) doEvent(ctx context.Context, ws *WebSocket, request []json.RawM
 		return ""
 	} else if !ok {
 		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "invalid: signature is invalid"})
+		return ""
+	}
+
+	// NIP-40: relays should drop events that are already expired when they
+	// are published, so they are neither stored nor broadcast.
+	if isExpired(&evt) {
+		ws.WriteJSON(nostr.OKEnvelope{EventID: evt.ID, OK: false, Reason: "invalid: event has expired"})
 		return ""
 	}
 
@@ -322,12 +343,12 @@ func (s *Server) doReq(ctx context.Context, ws *WebSocket, request []json.RawMes
 					// NIP-67: an event we are not going to send proves the
 					// relay holds more than it delivered. Events the relay
 					// would drop anyway are not "more" from the client's side.
-					if s.options.skipEventFunc == nil || !s.options.skipEventFunc(event) {
+					if !s.skipEvent(event) {
 						more = true
 					}
 					continue
 				}
-				if s.options.skipEventFunc != nil && s.options.skipEventFunc(event) {
+				if s.skipEvent(event) {
 					continue
 				}
 				if err := ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: *event}); err != nil {
@@ -634,7 +655,7 @@ func (s *Server) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if ifmer, ok := s.relay.(Informationer); ok {
 		info = ifmer.GetNIP11InformationDocument()
 	} else {
-		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33, 67, 77}
+		supportedNIPs := []any{9, 11, 12, 15, 16, 20, 33, 40, 67, 77}
 		if _, ok := s.relay.(Auther); ok {
 			// NIP-42 authentication gates private direct messages and
 			// gift-wrapped events, which relayer handles for Auther relays.

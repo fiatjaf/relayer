@@ -150,6 +150,66 @@ func TestDoEvent_RejectedByRelay(t *testing.T) {
 	}
 }
 
+func TestDoEvent_NIP40Expiration(t *testing.T) {
+	store := &slicestore.SliceStore{}
+	srv := startTestRelay(t, &testRelay{storage: store})
+	defer srv.Shutdown(context.TODO())
+
+	conn := dialWS(t, srv.Addr)
+	sk := nostr.GeneratePrivateKey()
+	now := nostr.Now()
+
+	cases := []struct {
+		name   string
+		kind   int
+		tags   nostr.Tags
+		ok     bool
+		reason string
+	}{
+		{"expired", 1, nostr.Tags{{"expiration", fmt.Sprint(now - 10)}}, false, "invalid: event has expired"},
+		{"expires now", 1, nostr.Tags{{"expiration", fmt.Sprint(now)}}, false, "invalid: event has expired"},
+		{"expired deletion", 5, nostr.Tags{{"expiration", fmt.Sprint(now - 10)}}, false, "invalid: event has expired"},
+		{"expired ephemeral", 20001, nostr.Tags{{"expiration", fmt.Sprint(now - 10)}}, false, "invalid: event has expired"},
+		{"expires later", 1, nostr.Tags{{"expiration", fmt.Sprint(now + 3600)}}, true, ""},
+		{"malformed expiration", 1, nostr.Tags{{"expiration", "soon"}}, true, ""},
+	}
+	for _, c := range cases {
+		evt := signedEvent(sk, c.kind, c.name, c.tags)
+		sendJSON(t, conn, []interface{}{"EVENT", evt})
+		_, ok, reason := recvOK(t, conn)
+		if ok != c.ok || reason != c.reason {
+			t.Errorf("%s: got (%v, %q), want (%v, %q)", c.name, ok, reason, c.ok, c.reason)
+		}
+	}
+
+	// expired events must not have been stored
+	ch, err := store.QueryEvents(context.Background(), nostr.Filter{Authors: []string{mustPublicKey(t, sk)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := map[string]bool{}
+	for evt := range ch {
+		stored[evt.Content] = true
+	}
+	for _, name := range []string{"expired", "expires now", "expired deletion"} {
+		if stored[name] {
+			t.Errorf("%s event was stored", name)
+		}
+	}
+	if !stored["expires later"] || !stored["malformed expiration"] {
+		t.Errorf("accepted events were not stored: %v", stored)
+	}
+}
+
+func mustPublicKey(t *testing.T, sk string) string {
+	t.Helper()
+	pk, err := nostr.GetPublicKey(sk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pk
+}
+
 func TestDoEvent_NIP09Deletion(t *testing.T) {
 	srv := startTestRelay(t, &testRelay{storage: &slicestore.SliceStore{}})
 	defer srv.Shutdown(context.TODO())
@@ -234,6 +294,41 @@ func TestDoReq_Basic(t *testing.T) {
 	typ, _ = recvMessage(t, conn)
 	if typ != "EOSE" {
 		t.Fatalf("expected EOSE, got %s", typ)
+	}
+}
+
+func TestDoReq_NIP40HidesExpiredEvents(t *testing.T) {
+	store := &slicestore.SliceStore{}
+	srv := startTestRelay(t, &testRelay{storage: store})
+	defer srv.Shutdown(context.TODO())
+
+	sk := nostr.GeneratePrivateKey()
+	// An event stored before its expiration passed stays in the storage.
+	expired := signedEvent(sk, 1, "expired", nostr.Tags{{"expiration", fmt.Sprint(nostr.Now() - 10)}})
+	live := signedEvent(sk, 1, "live", nostr.Tags{{"expiration", fmt.Sprint(nostr.Now() + 3600)}})
+	for _, evt := range []nostr.Event{expired, live} {
+		if err := store.SaveEvent(context.Background(), &evt); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	conn := dialWS(t, srv.Addr)
+	sendJSON(t, conn, []interface{}{"REQ", "sub1", nostr.Filter{Kinds: []int{1}}})
+	var got []string
+	for {
+		typ, raw := recvMessage(t, conn)
+		if typ == "EOSE" {
+			break
+		}
+		if typ != "EVENT" {
+			t.Fatalf("expected EVENT or EOSE, got %s", typ)
+		}
+		var evt nostr.Event
+		json.Unmarshal(raw[2], &evt)
+		got = append(got, evt.Content)
+	}
+	if len(got) != 1 || got[0] != "live" {
+		t.Errorf("expected only the live event, got %v", got)
 	}
 }
 
@@ -460,6 +555,15 @@ func TestHandleNIP11(t *testing.T) {
 	}
 	if info.Software != "https://github.com/fiatjaf/relayer" {
 		t.Errorf("unexpected software: %q", info.Software)
+	}
+	hasNIP40 := false
+	for _, nip := range info.SupportedNIPs {
+		if fmt.Sprint(nip) == "40" {
+			hasNIP40 = true
+		}
+	}
+	if !hasNIP40 {
+		t.Errorf("expected supported_nips to include 40, got %#v", info.SupportedNIPs)
 	}
 }
 

@@ -116,7 +116,7 @@ func (s *Server) doNegOpen(ctx context.Context, ws *WebSocket, message []byte, s
 	vec := vector.New()
 	if events != nil {
 		for evt := range events {
-			if s.options.skipEventFunc != nil && s.options.skipEventFunc(evt) {
+			if s.skipEvent(evt) {
 				continue
 			}
 			vec.Insert(evt.CreatedAt, evt.ID)
