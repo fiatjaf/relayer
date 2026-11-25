@@ -14,6 +14,7 @@ These are handled by the framework itself, so every relay built on it gets them:
 | [01](https://github.com/nostr-protocol/nips/blob/master/01.md) | Basic protocol flow (`EVENT`, `REQ`, `CLOSE`, `EOSE`, `OK`, `CLOSED`, `NOTICE`), including what used to be NIPs 12, 15, 16, 20 and 33 |
 | [09](https://github.com/nostr-protocol/nips/blob/master/09.md) | Event deletion request |
 | [11](https://github.com/nostr-protocol/nips/blob/master/11.md) | Relay information document |
+| [40](https://github.com/nostr-protocol/nips/blob/master/40.md) | Expiration timestamp — expired events are rejected when published and not served by `REQ` or NIP-77 (they are not deleted from the storage, and `COUNT` is left to the storage) |
 | [67](https://github.com/nostr-protocol/nips/blob/master/67.md) | EOSE completeness hint |
 | [77](https://github.com/nostr-protocol/nips/blob/master/77.md) | Negentropy syncing (`NEG-OPEN`, `NEG-MSG`, `NEG-CLOSE`) |
 

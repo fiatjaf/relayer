@@ -241,6 +241,9 @@ func WithPerConnectionLimiter(rps rate.Limit, burst int) Option {
 	}
 }
 
+// WithSkipEventFunc sets a function deciding which stored events are not sent
+// to clients in REQ and NIP-77 results. Expired events (NIP-40) are always
+// skipped, so the function does not need to check for them.
 func WithSkipEventFunc(skipEventFunc func(*nostr.Event) bool) Option {
 	return func(o *Options) {
 		o.skipEventFunc = skipEventFunc
